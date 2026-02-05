@@ -11,13 +11,38 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
-# Source files (populated as phases are implemented)
-# set(LOOM_SOURCES
-#     src/main.cpp
-# )
+# Loom core library (grows with each phase)
+add_library(loom_core
+    src/util/error.cpp
+    src/util/log.cpp
+)
+target_include_directories(loom_core PUBLIC
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/third_party
+)
 
-# add_executable(loom ${LOOM_SOURCES})
+# Main executable (uncomment when CLI is ready)
+# add_executable(loom src/main.cpp src/cli.cpp)
+# target_link_libraries(loom loom_core)
+
+# Demo programs (for manual real-world testing)
+add_executable(demo_errors demos/demo_errors.cpp)
+target_link_libraries(demo_errors loom_core)
 
 # Testing
 enable_testing()
-# add_subdirectory(tests)
+
+# Catch2 test runner (shared main)
+add_library(catch2_main OBJECT tests/test_main.cpp)
+target_include_directories(catch2_main PUBLIC ${CMAKE_SOURCE_DIR}/third_party)
+
+# Helper function to add a test
+function(loom_add_test name)
+    add_executable(${name} ${ARGN} $<TARGET_OBJECTS:catch2_main>)
+    target_link_libraries(${name} loom_core)
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+# Phase 1 tests
+loom_add_test(test_result tests/test_result.cpp)
+loom_add_test(test_log tests/test_log.cpp)

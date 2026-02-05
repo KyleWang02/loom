@@ -11,9 +11,10 @@ class Result {
     std::variant<T, LoomError> data_;
 
     explicit Result(T val) : data_(std::move(val)) {}
-    explicit Result(LoomError err) : data_(std::move(err)) {}
 
 public:
+    // Implicit from LoomError so LOOM_TRY can return errors across Result<T> types
+    Result(LoomError err) : data_(std::move(err)) {}
     static Result ok(T val) { return Result(std::move(val)); }
     static Result err(LoomError e) { return Result(std::move(e)); }
 
@@ -26,6 +27,7 @@ public:
 
     LoomError& error() & { return std::get<LoomError>(data_); }
     const LoomError& error() const& { return std::get<LoomError>(data_); }
+    LoomError&& error() && { return std::get<LoomError>(std::move(data_)); }
 
     explicit operator bool() const { return is_ok(); }
 
