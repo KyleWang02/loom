@@ -15,7 +15,8 @@ include/loom/
                             LOOM_TRY macro. Status = Result<monostate>. ok_status().
   log.hpp                   loom::log namespace. 5 levels, ANSI color, isatty detection.
   sha256.hpp                SHA256 class. Incremental update/finalize. hash_hex, hash_file.
-  uuid.hpp                  (planned) Uuid struct, v4 generation, base36 encode/decode.
+  uuid.hpp                  Uuid struct. v4 generation, to_string/from_string,
+                            encode_base36/decode_base36. 128-bit big-endian arithmetic.
   glob.hpp                  (planned) Glob pattern matching.
   swap.hpp                  (planned) {{ variable }} substitution engine.
   lang/
@@ -27,6 +28,8 @@ src/util/
   log.cpp                   Global state: s_level, s_color_enabled. va_list printf to stderr.
   sha256.cpp                FIPS 180-4 implementation. K constants, round functions,
                             message schedule, padding. ~190 lines.
+  uuid.cpp                  /dev/urandom RNG + mt19937_64 fallback. Hex helpers.
+                            Base36 via divide-by-36 / multiply-by-36 on byte array. ~170 lines.
 
 tests/
   test_main.cpp             Catch2 CATCH_CONFIG_MAIN. Compiled once, linked to all tests.
@@ -36,6 +39,9 @@ tests/
                             stderr capture via pipe redirect.
   test_sha256.cpp           10 cases: NIST vectors (empty, "abc", 448-bit, 896-bit),
                             incremental, hash_file, bytes_to_hex, 10K-byte input.
+  test_uuid.cpp             17 cases: v4 version/variant bits, uniqueness, to_string format,
+                            from_string roundtrip + error rejection, base36 roundtrip
+                            (random, all-zero, all-0xFF), equality operators.
   fixtures/
     simple_module.v         8-bit counter with clk/rst/en. Used by SHA-256 file hash test.
 
@@ -50,6 +56,7 @@ demos/
 result.hpp ──depends on──> error.hpp
 log.hpp    ──standalone──
 sha256.hpp ──standalone──  (uses <filesystem> for hash_file)
+uuid.hpp   ──depends on──> result.hpp (returns Result<Uuid> from from_string, decode_base36)
 
 All src/*.cpp include their corresponding header.
 All tests link against loom_core (static lib) + catch2_main (object lib).

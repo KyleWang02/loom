@@ -16,6 +16,7 @@ add_library(loom_core
     src/util/error.cpp
     src/util/log.cpp
     src/util/sha256.cpp
+    src/util/uuid.cpp
 )
 target_include_directories(loom_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -50,3 +51,4 @@ endfunction()
 loom_add_test(test_result tests/test_result.cpp)
 loom_add_test(test_log tests/test_log.cpp)
 loom_add_test(test_sha256 tests/test_sha256.cpp)
+loom_add_test(test_uuid tests/test_uuid.cpp)

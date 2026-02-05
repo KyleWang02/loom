@@ -84,13 +84,13 @@ Files: `result.hpp`, `error.hpp`, `log.hpp`, `sha256.hpp`, `uuid.hpp`, `glob.hpp
 - [x] Implement `Status` type alias for void-returning functions
 - [x] Implement logging with levels (Trace, Debug, Info, Warn, Error) and ANSI colors
 - [x] Implement SHA-256 from NIST FIPS 180-4 (~200 lines)
-- [ ] Implement UUID v4 generation + base36 encoding/decoding
+- [x] Implement UUID v4 generation + base36 encoding/decoding
 - [ ] Implement glob pattern matching (`*`, `**`, `?`, `[a-z]`, negation)
 - [ ] Implement `{{ variable }}` swap/substitution engine
 - [x] Set up Catch2 integration in CMake
 - [ ] Write tests for all components
 - [x] Verify all NIST SHA-256 test vectors pass
-- [ ] Verify UUID base36 roundtrip is lossless
+- [x] Verify UUID base36 roundtrip is lossless
 - [x] Run under AddressSanitizer
 
 ### Phase 2: Manifest, Configuration, and Versioning
