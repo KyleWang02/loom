@@ -1,0 +1,24 @@
+# Build
+build/
+cmake-build-*/
+.loom/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Compiled
+*.o
+*.a
+*.so
+*.dylib
+
+# Test artifacts
+Testing/
