@@ -1,45 +1,38 @@
-# Loom Session Log
+# Session Log
 
-## 2026-02-04
+<!-- This file contains ONLY the most recent session. -->
+<!-- Previous sessions are in docs/ARCHIVE.md (cold storage). -->
 
-**Focus**: Phase 0 — Project scaffolding and session management
+## 2026-02-05
+
+**Focus**: Migrate session continuity workflow to V2 (tiered memory model)
 
 **Completed**:
-- Initialized git repository
-- Created full directory structure
-- Created `CLAUDE.md` with project summary, rules, architecture overview, naming conventions
-- Created `docs/PLAN.md` with full phased roadmap and dependency map
-- Created `docs/SESSION_LOG.md` (this file)
-- Created `.claude/commands/handoff.md` slash command
-- Created `.gitignore` and `CMakeLists.txt` skeleton
+- Created `docs/ARCHIVE.md` — cold storage with all prior session entries
+- Created `docs/ARCHITECTURE.md` — module map, dependency graph, key patterns
+- Rewrote `docs/SESSION_LOG.md` — now single-session only (this file)
+- Rewrote `CLAUDE.md` — lean launchpad under 1,500 tokens
+- Rewrote `.claude/commands/handoff.md` — V2 workflow (archive → overwrite → update)
+- Verified `docs/PLAN.md` markers are correct
 
 **Key Decisions**:
-- Using `master` as default branch (git default)
-- `CLAUDE.md` kept under ~2000 words for fast context loading
-- `PLAN.md` uses checkbox tracking with `← CURRENT` / `← NEXT UP` markers
-- Session log uses reverse chronological order (newest first)
+- SESSION_LOG.md is now overwritten each handoff (not appended)
+- Old entries go to ARCHIVE.md (prepended, newest first)
+- ARCHITECTURE.md is updated only when structure changes, not every session
+- CLAUDE.md trimmed to pointers + conventions + state (no architecture details)
 
-**Issues & Gotchas**:
-- None (initial setup)
+**Checkpoint Status**: Mid Phase 1. Chunks 1-2 done (Error/Result/Log, SHA-256). Next: UUID, Glob, Swap.
 
-**Failed Approaches**:
-- None (initial setup)
-
-**Next Session Should**:
-1. Begin Phase 1: Foundation Layer
-2. Set up Catch2 in `third_party/`
-3. Implement `Result<T, LoomError>` and `LoomError`
-4. Implement SHA-256 from NIST spec
-5. Implement UUID v4 + base36
-6. Implement glob matcher
-7. Implement swap engine
-8. Implement logging
-9. Write tests for all Phase 1 components
+**Next**:
+1. Implement UUID v4 + base36 (`uuid.hpp` + `uuid.cpp`)
+2. Implement glob pattern matching (`glob.hpp` + `glob.cpp`)
+3. Implement swap engine (`swap.hpp` + `swap.cpp`)
+4. Tests for each, following checkpoint workflow
+5. Complete Phase 1, full regression, ASan pass
 
 **Files Changed**:
-- `CLAUDE.md` (new)
-- `docs/PLAN.md` (new)
-- `docs/SESSION_LOG.md` (new)
-- `.claude/commands/handoff.md` (new)
-- `.gitignore` (new)
-- `CMakeLists.txt` (new)
+- `docs/ARCHIVE.md` (new)
+- `docs/ARCHITECTURE.md` (new)
+- `docs/SESSION_LOG.md` (rewritten)
+- `CLAUDE.md` (rewritten)
+- `.claude/commands/handoff.md` (rewritten)

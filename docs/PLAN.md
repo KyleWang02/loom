@@ -14,9 +14,9 @@ See `CLAUDE.md` "Checkpoint Workflow" section for full details.
 
 ## Phase Tracking
 
-- [ ] Phase 0: Project Scaffolding and Session Management ← CURRENT
-- [ ] Phase 1: Foundation Layer (Result, SHA256, UUID, Glob, Swap, Log) ← NEXT UP
-- [ ] Phase 2: Manifest, Configuration, and Versioning
+- [x] Phase 0: Project Scaffolding and Session Management ← DONE
+- [ ] Phase 1: Foundation Layer (Result, SHA256, UUID, Glob, Swap, Log) ← CURRENT
+- [ ] Phase 2: Manifest, Configuration, and Versioning ← NEXT UP
 - [ ] Phase 3: Verilog/SystemVerilog Lexer and Tokenizer
 - [ ] Phase 4: Verilog/SystemVerilog Parser and Design Unit Extraction
 - [ ] Phase 5: Graph Data Structures and Algorithms
@@ -65,33 +65,33 @@ Parallelizable: Phases 2, 3, and 5 can be done in parallel (all depend only on P
 
 ### Phase 0: Project Scaffolding and Session Management
 
-- [ ] Initialize git repository
-- [ ] Create `CLAUDE.md` with project summary and rules
-- [ ] Create `docs/PLAN.md` with full roadmap
-- [ ] Create `docs/SESSION_LOG.md` for rolling journal
-- [ ] Create `.claude/commands/handoff.md` slash command
-- [ ] Create directory structure scaffolding
-- [ ] Create `.gitignore`
-- [ ] Create `CMakeLists.txt` skeleton
+- [x] Initialize git repository
+- [x] Create `CLAUDE.md` with project summary and rules
+- [x] Create `docs/PLAN.md` with full roadmap
+- [x] Create `docs/SESSION_LOG.md` for rolling journal
+- [x] Create `.claude/commands/handoff.md` slash command
+- [x] Create directory structure scaffolding
+- [x] Create `.gitignore`
+- [x] Create `CMakeLists.txt` skeleton
 
 ### Phase 1: Foundation Layer
 
 Files: `result.hpp`, `error.hpp`, `log.hpp`, `sha256.hpp`, `uuid.hpp`, `glob.hpp`, `swap.hpp` + implementations + tests
 
-- [ ] Implement `LoomError` struct with error codes, message, hint, file, line
-- [ ] Implement `Result<T, LoomError>` with `ok()`, `value()`, `error()`, monadic ops
-- [ ] Implement `LOOM_TRY` macro for error propagation
-- [ ] Implement `Status` type alias for void-returning functions
-- [ ] Implement logging with levels (Trace, Debug, Info, Warn, Error) and ANSI colors
-- [ ] Implement SHA-256 from NIST FIPS 180-4 (~200 lines)
+- [x] Implement `LoomError` struct with error codes, message, hint, file, line
+- [x] Implement `Result<T, LoomError>` with `ok()`, `value()`, `error()`, monadic ops
+- [x] Implement `LOOM_TRY` macro for error propagation
+- [x] Implement `Status` type alias for void-returning functions
+- [x] Implement logging with levels (Trace, Debug, Info, Warn, Error) and ANSI colors
+- [x] Implement SHA-256 from NIST FIPS 180-4 (~200 lines)
 - [ ] Implement UUID v4 generation + base36 encoding/decoding
 - [ ] Implement glob pattern matching (`*`, `**`, `?`, `[a-z]`, negation)
 - [ ] Implement `{{ variable }}` swap/substitution engine
-- [ ] Set up Catch2 integration in CMake
+- [x] Set up Catch2 integration in CMake
 - [ ] Write tests for all components
-- [ ] Verify all NIST SHA-256 test vectors pass
+- [x] Verify all NIST SHA-256 test vectors pass
 - [ ] Verify UUID base36 roundtrip is lossless
-- [ ] Run under AddressSanitizer
+- [x] Run under AddressSanitizer
 
 ### Phase 2: Manifest, Configuration, and Versioning
 
