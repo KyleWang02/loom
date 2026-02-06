@@ -17,8 +17,79 @@ include/loom/
   sha256.hpp                SHA256 class. Incremental update/finalize. hash_hex, hash_file.
   uuid.hpp                  Uuid struct. v4 generation, to_string/from_string,
                             encode_base36/decode_base36. 128-bit big-endian arithmetic.
-  glob.hpp                  (planned) Glob pattern matching.
-  swap.hpp                  (planned) {{ variable }} substitution engine.
+  glob.hpp                  (planned) Glob pattern matching. *, **, ?, [a-z], negation.
+  swap.hpp                  (planned) {{ variable }} substitution engine. Used by EDA
+                            drivers (Phase 12) and doc templates (Phase 14).
+
+  target_expr.hpp           (planned) TargetExpr class. Boolean filter expressions:
+                            all(), any(), not(), bare identifiers, * wildcard.
+                            Recursive descent parser + evaluator.
+  source_group.hpp          (planned) SourceGroup struct. Files + optional TargetExpr +
+                            include_dirs + defines. filter_source_groups().
+
+  version.hpp               (planned) Version (major.minor.micro + label), PartialVersion,
+                            semver constraint parsing (^, ~, >=, <, ranges).
+  name.hpp                  (planned) PkgName validation and normalization.
+  manifest.hpp              (planned) Manifest (Loom.toml) parser. [package], [dependencies],
+                            [[sources]], [lint], [workspace], [targets.*], [build].
+  config.hpp                (planned) Config with layered loading (global > workspace > local).
+
+  git.hpp                   (planned) GitCli class. Subprocess wrapper for git operations:
+                            ls_remote, clone_bare, fetch, checkout, resolve_ref, show_file.
+  source.hpp                (planned) DependencySource variant: GitSource | PathSource.
+                            GitSource: url + tag/version/rev/branch.
+  cache_git.hpp             (planned) CacheManager for git deps. Two-tier cache:
+                            bare repos in ~/.loom/cache/git/db/,
+                            checkouts in ~/.loom/cache/git/checkouts/.
+  lockfile.hpp              (planned) Loom.lock TOML format. LockedPackage, LockFile.
+
+  cache.hpp                 (planned) SQLite-based incremental build cache.
+                            file_stat, parse_result, include_dep, dep_edge, blueprint tables.
+                            4-layer hashing: content → parse → effective → blueprint.
+                            Stat-based fast path (inode + mtime + size).
+
+  workspace.hpp             (planned) Workspace class. Virtual and root-package types.
+                            Member discovery via glob, single Loom.lock, config inheritance.
+  project.hpp               (planned) Project detection, loading, source file collection.
+  local_override.hpp        (planned) Loom.local parser. OverrideSource (path/git).
+                            Bypasses lockfile without modifying it.
+
+  resolver.hpp              (planned) DependencyResolver. BFS resolution, conflict detection,
+                            semver tag matching, workspace integration.
+
+  blueprint.hpp             (planned) Blueprint generation with target filtering.
+                            Topological sort, top-module detection, testbench heuristic.
+
+  target/
+    types.hpp               (planned) Blueprint, SourceFile, ToolAction, ToolResult, ToolOptions.
+    tool_driver.hpp         (planned) ToolDriver abstract base class + registry.
+    driver_icarus.hpp       (planned) Icarus Verilog: iverilog/vvp.
+    driver_verilator.hpp    (planned) Verilator: lint + simulate.
+    driver_vivado_sim.hpp   (planned) Vivado Simulator: xvlog/xelab/xsim.
+    driver_vivado_synth.hpp (planned) Vivado Synthesis: TCL batch.
+    driver_quartus.hpp      (planned) Intel Quartus Prime: TCL.
+    driver_modelsim.hpp     (planned) ModelSim/QuestaSim: TCL + DO.
+    driver_vcs.hpp          (planned) Synopsys VCS: file list.
+    driver_xcelium.hpp      (planned) Cadence Xcelium: xrun.
+    driver_yosys.hpp        (planned) Yosys: .ys script.
+    driver_custom.hpp       (planned) Custom: user-defined commands with {{ }} substitution.
+
+  lint/
+    lint_rule.hpp           (planned) LintRule base class, Severity enum, Diagnostic struct.
+    lint_engine.hpp         (planned) LintEngine: load config, run rules, collect diagnostics.
+    lint_config.hpp         (planned) LintConfig: parse [lint] from Loom.toml.
+    lint_suppression.hpp    (planned) SuppressionMap: // loom: ignore[rule-id] comments.
+    rules/                  (planned) 22 rules: 11 correctness, 8 structure, 3 style.
+
+  doc/
+    doc_comment.hpp         (planned) DocTag, DocComment structs. /// comment parsing.
+    doc_model.hpp           (planned) DocModel IR: PortDoc, ParamDoc, DesignUnitDoc, CrossRef.
+    doc_extractor.hpp       (planned) DocExtractor: walk tokens, associate comments with units.
+    renderer.hpp            (planned) Renderer base class + RenderConfig.
+    markdown_renderer.hpp   (planned) Markdown output with Mermaid dependency graphs.
+    html_renderer.hpp       (planned) Static HTML site with search, sidebar, diagrams.
+    template_engine.hpp     (planned) Lightweight template engine built on Swap.
+
   lang/
     verilog/                (planned) Verilog lexer, parser, DST.
     sv/                     (planned) SystemVerilog lexer, parser, DST.
@@ -30,6 +101,14 @@ src/util/
                             message schedule, padding. ~190 lines.
   uuid.cpp                  /dev/urandom RNG + mt19937_64 fallback. Hex helpers.
                             Base36 via divide-by-36 / multiply-by-36 on byte array. ~170 lines.
+
+src/target/                 (planned) ToolDriver implementations + registry.
+src/lint/                   (planned) LintEngine + 22 rule implementations.
+src/doc/                    (planned) DocExtractor, renderers, template engine.
+src/git/                    (planned) GitCli, CacheManager, resolver, lockfile.
+
+third_party/
+  sqlite3/                  (planned) SQLite amalgamation: sqlite3.h + sqlite3.c (~250 KB).
 
 tests/
   test_main.cpp             Catch2 CATCH_CONFIG_MAIN. Compiled once, linked to all tests.
@@ -48,6 +127,10 @@ tests/
 demos/
   demo_errors.cpp           CLI demo: no-args, bad-path, wrong-ext, happy-path.
                             Chains 4 Result-returning functions with LOOM_TRY.
+
+docs/
+  research/                 Detailed feature specifications from research agents.
+    loom_doc_specification.md  Documentation generation: DocModel, renderers, templates.
 ```
 
 ## Dependency Graph (implemented files)
@@ -60,6 +143,44 @@ uuid.hpp   ──depends on──> result.hpp (returns Result<Uuid> from from_st
 
 All src/*.cpp include their corresponding header.
 All tests link against loom_core (static lib) + catch2_main (object lib).
+```
+
+## Planned Dependency Graph (full project)
+
+```
+Foundation:
+  result.hpp ──> error.hpp
+  uuid.hpp ──> result.hpp
+  target_expr.hpp ──> result.hpp
+  source_group.hpp ──> target_expr.hpp
+
+Manifest/Config:
+  manifest.hpp ──> version.hpp, name.hpp, source_group.hpp, result.hpp
+  config.hpp ──> result.hpp
+
+Git/Dependencies:
+  git.hpp ──> result.hpp
+  cache_git.hpp ──> git.hpp, sha256.hpp
+  lockfile.hpp ──> result.hpp
+  resolver.hpp ──> git.hpp, lockfile.hpp, manifest.hpp, workspace.hpp
+
+Build Cache:
+  cache.hpp ──> result.hpp, sha256.hpp (+ third_party/sqlite3)
+
+Workspace/Project:
+  workspace.hpp ──> manifest.hpp, glob.hpp, result.hpp
+  local_override.hpp ──> result.hpp
+  project.hpp ──> manifest.hpp, workspace.hpp
+
+Blueprint/Targets:
+  blueprint.hpp ──> source_group.hpp, cache.hpp
+  target/tool_driver.hpp ──> blueprint.hpp, result.hpp
+  target/driver_custom.hpp ──> tool_driver.hpp, swap.hpp
+
+Lint/Doc:
+  lint/lint_engine.hpp ──> lint_rule.hpp, lint_config.hpp, lint_suppression.hpp
+  doc/doc_extractor.hpp ──> doc_comment.hpp, doc_model.hpp
+  doc/template_engine.hpp ──> swap.hpp
 ```
 
 ## Key Patterns
@@ -80,6 +201,21 @@ static std::string fixture_path(const std::string& name) {
 
 **Logging**: All output to stderr. Colors auto-detected. Tests capture stderr via
 `dup/dup2/pipe` redirect. Always call `set_color_enabled(false)` before capture.
+
+**Target filtering**: Source files are grouped into `SourceGroup` entries, each with
+an optional `TargetExpr`. At build time, groups are filtered against the active target
+set (from `--target` CLI flag). Only matching groups' files enter the blueprint pipeline.
+
+**Git dependencies**: All dependency sources are explicit (git URL or local path).
+No central registry. Loom shells out to the `git` CLI for all operations, inheriting
+the user's SSH keys, credential helpers, and `.gitconfig`.
+
+**Incremental cache**: SQLite-based content-addressed cache. Stat metadata (inode +
+mtime + size) provides a fast path to skip SHA-256 hashing of unchanged files.
+Parse results and blueprints are cached by content hash.
+
+**Loom.local overrides**: Developer-local overrides that bypass the lockfile without
+modifying it. Loom.local is gitignored by default and emits a warning when active.
 
 ## Build
 

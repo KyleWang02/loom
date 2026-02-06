@@ -4,6 +4,8 @@
 
 Loom is a package manager and build system for Verilog and SystemVerilog, written in C++17. It manages reusable HDL IP cores across projects, resolves transitive dependencies, generates topologically-sorted file lists (Blueprints) for EDA tools, handles namespace collisions via Dynamic Symbol Transformation (DST), and integrates with arbitrary EDA backends via configurable Targets.
 
+Always make use of subagent workflows
+
 **Language**: C++17 only. No VHDL support.
 **Supported HDL**: Verilog (.v, .vl, .vlg) and SystemVerilog (.sv)
 
