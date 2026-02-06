@@ -2,7 +2,7 @@
 
 ## What is Loom?
 
-Loom is a package manager and build system for Verilog and SystemVerilog, written in C++17. It manages reusable HDL IP cores across projects, resolves transitive dependencies, generates topologically-sorted file lists (Blueprints) for EDA tools, handles namespace collisions via Dynamic Symbol Transformation (DST), and integrates with arbitrary EDA backends via configurable Targets.
+Loom is a package manager and build system for Verilog and SystemVerilog, written in C++17. It manages reusable HDL IP cores across projects, resolves transitive dependencies, generates topologically-sorted file lists (Filelists) for EDA tools, handles namespace collisions via Symbol Remapping (SR), and integrates with arbitrary EDA backends via configurable Targets.
 
 Always make use of subagent workflows
 
@@ -52,8 +52,9 @@ Run the `/handoff` command at end of session. It:
 
 ## Current State
 
-- **Date**: 2026-02-05
-- **Phase**: Phase 1 — Foundation (Chunks 1-3 done: Error/Result/Log, SHA-256, UUID)
+- **Date**: 2026-02-06
+- **Phase**: Phase 1 — Foundation COMPLETE. Ready for Phase 2+.
 - **Branch**: main
 - **Blockers**: None
-- **Tests**: 55 passing (21 result + 7 log + 10 sha256 + 17 uuid), 4 suites
+- **Tests**: 89 passing (21 result + 7 log + 10 sha256 + 17 uuid + 18 glob + 16 swap), 6 suites
+- **Terminology**: "Filelist" (not Blueprint), "Symbol Remapping/SR" (not DST)

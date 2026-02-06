@@ -17,9 +17,11 @@ include/loom/
   sha256.hpp                SHA256 class. Incremental update/finalize. hash_hex, hash_file.
   uuid.hpp                  Uuid struct. v4 generation, to_string/from_string,
                             encode_base36/decode_base36. 128-bit big-endian arithmetic.
-  glob.hpp                  (planned) Glob pattern matching. *, **, ?, [a-z], negation.
-  swap.hpp                  (planned) {{ variable }} substitution engine. Used by EDA
-                            drivers (Phase 12) and doc templates (Phase 14).
+  glob.hpp                  Glob pattern matching: glob_match, glob_expand, glob_filter.
+                            Supports *, **, ?, [a-z], [!0-9], ! negation prefix.
+  swap.hpp                  {{ variable }} substitution engine: swap_template (strict),
+                            swap_template_lenient. \{{ escape. Used by EDA drivers
+                            (Phase 12) and doc templates (Phase 14).
 
   target_expr.hpp           (planned) TargetExpr class. Boolean filter expressions:
                             all(), any(), not(), bare identifiers, * wildcard.
@@ -44,8 +46,8 @@ include/loom/
   lockfile.hpp              (planned) Loom.lock TOML format. LockedPackage, LockFile.
 
   cache.hpp                 (planned) SQLite-based incremental build cache.
-                            file_stat, parse_result, include_dep, dep_edge, blueprint tables.
-                            4-layer hashing: content → parse → effective → blueprint.
+                            file_stat, parse_result, include_dep, dep_edge, filelist tables.
+                            4-layer hashing: content → parse → effective → filelist.
                             Stat-based fast path (inode + mtime + size).
 
   workspace.hpp             (planned) Workspace class. Virtual and root-package types.
@@ -57,11 +59,11 @@ include/loom/
   resolver.hpp              (planned) DependencyResolver. BFS resolution, conflict detection,
                             semver tag matching, workspace integration.
 
-  blueprint.hpp             (planned) Blueprint generation with target filtering.
+  filelist.hpp              (planned) Filelist generation with target filtering.
                             Topological sort, top-module detection, testbench heuristic.
 
   target/
-    types.hpp               (planned) Blueprint, SourceFile, ToolAction, ToolResult, ToolOptions.
+    types.hpp               (planned) Filelist, SourceFile, ToolAction, ToolResult, ToolOptions.
     tool_driver.hpp         (planned) ToolDriver abstract base class + registry.
     driver_icarus.hpp       (planned) Icarus Verilog: iverilog/vvp.
     driver_verilator.hpp    (planned) Verilator: lint + simulate.
@@ -91,8 +93,8 @@ include/loom/
     template_engine.hpp     (planned) Lightweight template engine built on Swap.
 
   lang/
-    verilog/                (planned) Verilog lexer, parser, DST.
-    sv/                     (planned) SystemVerilog lexer, parser, DST.
+    verilog/                (planned) Verilog lexer, parser, symbol remapping.
+    sv/                     (planned) SystemVerilog lexer, parser, symbol remapping.
 
 src/util/
   error.cpp                 LoomError::format(), code_name(). Pure string formatting.
@@ -101,6 +103,11 @@ src/util/
                             message schedule, padding. ~190 lines.
   uuid.cpp                  /dev/urandom RNG + mt19937_64 fallback. Hex helpers.
                             Base36 via divide-by-36 / multiply-by-36 on byte array. ~170 lines.
+  glob.cpp                  Segment-based recursive matching. normalize_path, split_segments,
+                            match_segment (two-pointer with backtracking), match_segments
+                            (handles **). glob_expand via recursive_directory_iterator. ~170 lines.
+  swap.cpp                  Single-pass scanner for {{ var }}. Whitespace-trimmed keys,
+                            \{{ escape, strict (errors) vs lenient (passthrough). ~120 lines.
 
 src/target/                 (planned) ToolDriver implementations + registry.
 src/lint/                   (planned) LintEngine + 22 rule implementations.
@@ -121,6 +128,11 @@ tests/
   test_uuid.cpp             17 cases: v4 version/variant bits, uniqueness, to_string format,
                             from_string roundtrip + error rejection, base36 roundtrip
                             (random, all-zero, all-0xFF), equality operators.
+  test_glob.cpp             18 cases: literal matching, *, ?, **, char classes [a-z]/[!0-9],
+                            negation, glob_filter include+exclude, filesystem expand.
+  test_swap.cpp             16 cases: single/multi/no vars, whitespace, errors (undefined,
+                            unclosed, empty name, hint), \{{ escape, no recursion,
+                            adjacent vars, lenient mode.
   fixtures/
     simple_module.v         8-bit counter with clk/rst/en. Used by SHA-256 file hash test.
 
@@ -140,6 +152,8 @@ result.hpp ──depends on──> error.hpp
 log.hpp    ──standalone──
 sha256.hpp ──standalone──  (uses <filesystem> for hash_file)
 uuid.hpp   ──depends on──> result.hpp (returns Result<Uuid> from from_string, decode_base36)
+glob.hpp   ──depends on──> result.hpp (glob_expand returns Result)
+swap.hpp   ──depends on──> result.hpp (swap_template returns Result)
 
 All src/*.cpp include their corresponding header.
 All tests link against loom_core (static lib) + catch2_main (object lib).
@@ -172,9 +186,9 @@ Workspace/Project:
   local_override.hpp ──> result.hpp
   project.hpp ──> manifest.hpp, workspace.hpp
 
-Blueprint/Targets:
-  blueprint.hpp ──> source_group.hpp, cache.hpp
-  target/tool_driver.hpp ──> blueprint.hpp, result.hpp
+Filelist/Targets:
+  filelist.hpp ──> source_group.hpp, cache.hpp
+  target/tool_driver.hpp ──> filelist.hpp, result.hpp
   target/driver_custom.hpp ──> tool_driver.hpp, swap.hpp
 
 Lint/Doc:
@@ -204,7 +218,7 @@ static std::string fixture_path(const std::string& name) {
 
 **Target filtering**: Source files are grouped into `SourceGroup` entries, each with
 an optional `TargetExpr`. At build time, groups are filtered against the active target
-set (from `--target` CLI flag). Only matching groups' files enter the blueprint pipeline.
+set (from `--target` CLI flag). Only matching groups' files enter the filelist pipeline.
 
 **Git dependencies**: All dependency sources are explicit (git URL or local path).
 No central registry. Loom shells out to the `git` CLI for all operations, inheriting
@@ -212,7 +226,7 @@ the user's SSH keys, credential helpers, and `.gitconfig`.
 
 **Incremental cache**: SQLite-based content-addressed cache. Stat metadata (inode +
 mtime + size) provides a fast path to skip SHA-256 hashing of unchanged files.
-Parse results and blueprints are cached by content hash.
+Parse results and filelists are cached by content hash.
 
 **Loom.local overrides**: Developer-local overrides that bypass the lockfile without
 modifying it. Loom.local is gitignored by default and emits a warning when active.

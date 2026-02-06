@@ -15,7 +15,7 @@ See `CLAUDE.md` "Checkpoint Workflow" section for full details.
 ## Phase Tracking
 
 - [x] Phase 0: Project Scaffolding and Session Management ← DONE
-- [ ] Phase 1: Foundation Layer (Result, SHA256, UUID, Glob, Swap, Log) ← CURRENT
+- [x] Phase 1: Foundation Layer (Result, SHA256, UUID, Glob, Swap, Log) ← DONE
 - [ ] Phase 2: Target Expression Parser
 - [ ] Phase 3: Manifest, Configuration, and Versioning
 - [ ] Phase 4: Verilog/SystemVerilog Lexer and Tokenizer
@@ -25,12 +25,12 @@ See `CLAUDE.md` "Checkpoint Workflow" section for full details.
 - [ ] Phase 8: Incremental Build Cache (SQLite)
 - [ ] Phase 9: Workspace, Project Model, and Local Overrides
 - [ ] Phase 10: Dependency Resolution and Lockfile
-- [ ] Phase 11: Blueprint Generation (with Target Filtering)
+- [ ] Phase 11: Filelist Generation (with Target Filtering)
 - [ ] Phase 12: EDA Tool Drivers
 - [ ] Phase 13: Lint Engine
 - [ ] Phase 14: Documentation Generation
 - [ ] Phase 15: CLI Interface and Commands
-- [ ] Phase 16: Integration, DST, and Polish
+- [ ] Phase 16: Integration, Symbol Remapping, and Polish
 
 ## Phase Dependency Map
 
@@ -53,7 +53,7 @@ Phase 1 (Foundation)
   │                  │  │  │     ├──> Phase 10 (Dep Resolution) ◄── Phase 7
   │                  │  │  │     │         │
   │                  │  │  │     │         v
-  │                  │  │  └──> Phase 11 (Blueprint) ◄── Phase 6
+  │                  │  │  └──> Phase 11 (Filelist) ◄── Phase 6
   │                  │  │                  │
   │                  │  │                  v
   │                  │  │         Phase 12 (EDA Drivers) ◄── Phase 1 (Swap)
@@ -66,7 +66,7 @@ Phase 1 (Foundation)
   └──────────────────────────────────────> Phase 15 (CLI)
                                                     │
                                                     v
-                                            Phase 16 (Integration, DST)
+                                            Phase 16 (Integration, SR)
 ```
 
 Parallelizable groups after Phase 1:
@@ -76,9 +76,7 @@ Parallelizable groups after Phase 1:
 - **Group D**: Phase 10 (after Phases 7, 9), Phase 11 (after Phases 5, 6, 10)
 - **Group E**: Phase 12 (after Phase 11)
 
-## What Changed from the Original Plan
-
-This plan incorporates 8 differentiation features that set Loom apart from Orbit and other HDL package managers. The key architectural changes:
+## What Changed from the Original Plan:
 
 | Change | Rationale |
 |--------|-----------|
@@ -117,10 +115,10 @@ Files: `result.hpp`, `error.hpp`, `log.hpp`, `sha256.hpp`, `uuid.hpp`, `glob.hpp
 - [x] Implement logging with levels (Trace, Debug, Info, Warn, Error) and ANSI colors
 - [x] Implement SHA-256 from NIST FIPS 180-4 (~200 lines)
 - [x] Implement UUID v4 generation + base36 encoding/decoding
-- [ ] Implement glob pattern matching (`*`, `**`, `?`, `[a-z]`, negation)
-- [ ] Implement `{{ variable }}` swap/substitution engine (also used by EDA drivers and doc templates)
+- [x] Implement glob pattern matching (`*`, `**`, `?`, `[a-z]`, negation)
+- [x] Implement `{{ variable }}` swap/substitution engine (also used by EDA drivers and doc templates)
 - [x] Set up Catch2 integration in CMake
-- [ ] Write tests for glob and swap
+- [x] Write tests for glob and swap
 - [x] Verify all NIST SHA-256 test vectors pass
 - [x] Verify UUID base36 roundtrip is lossless
 - [x] Run under AddressSanitizer
@@ -251,7 +249,7 @@ Expanded from original to extract additional AST structures needed by the lint e
 - [ ] Produce `ModuleAST` struct that bundles all extracted data per module
 - [ ] Write tests and fixtures
 
-**ModuleAST** (consumed by lint, docs, and blueprint):
+**ModuleAST** (consumed by lint, docs, and filelist):
 ```cpp
 struct ModuleAST {
     std::string name;
@@ -335,14 +333,14 @@ Content-addressed caching system that avoids re-parsing unchanged files. Based o
   - `parse_result` — parse cache: `content_hash -> serialized ParseResult`
   - `include_dep` — include tracking: `source_hash -> (include_path, include_hash)`
   - `dep_edge` — dependency edges: `source_hash -> (source_unit, target_unit)`
-  - `blueprint` — blueprint cache: `blueprint_key -> (file_list, top_modules)`
+  - `filelist` — filelist cache: `filelist_key -> (file_list, top_modules)`
 - [ ] Implement `Cache` class with pImpl pattern (SQLite handle isolation):
   - `open()` — open/create database with WAL mode, set PRAGMAs
   - `lookup_stat()` / `update_stat()` / `remove_stat()` — stat cache
   - `lookup_parse()` / `store_parse()` — parse result cache
   - `get_includes()` / `store_includes()` / `find_includers()` — include dep tracking
   - `get_edges()` / `store_edges()` — dependency edge tracking
-  - `lookup_blueprint()` / `store_blueprint()` — blueprint cache
+  - `lookup_filelist()` / `store_filelist()` — filelist cache
   - `prune()` — remove orphaned entries
   - `clear()` — delete all data
 - [ ] Implement `ParseResult` binary serialization format:
@@ -352,11 +350,11 @@ Content-addressed caching system that avoids re-parsing unchanged files. Based o
   - Layer 1: `file_content_hash = SHA-256(file bytes)` with stat shortcut
   - Layer 2: `parse_cache_key = content_hash`
   - Layer 3: `effective_hash = SHA-256(content_hash + include_hashes + defines + include_dirs)`
-  - Layer 4: `blueprint_key = SHA-256(loom_version + manifest_hash + all effective_hashes)`
+  - Layer 4: `filelist_key = SHA-256(loom_version + manifest_hash + all effective_hashes)`
 - [ ] Implement cascading invalidation via reverse-dependency index (include_dep reverse lookup)
-- [ ] Implement `cached_file_hash()`, `effective_file_hash()`, `compute_blueprint_key()` helpers
+- [ ] Implement `cached_file_hash()`, `effective_file_hash()`, `compute_filelist_key()` helpers
 - [ ] Handle edge cases: concurrent access (WAL), corruption (recreate), disk full (warn + continue), symlinks (canonical path), Loom version upgrade (schema migration)
-- [ ] Write tests: stat cache hit/miss, parse result roundtrip, include invalidation cascade, blueprint cache, schema migration, corruption recovery
+- [ ] Write tests: stat cache hit/miss, parse result roundtrip, include invalidation cascade, filelist cache, schema migration, corruption recovery
 
 **Performance targets**: stat lookup < 0.1ms, parse lookup < 0.5ms, full incremental check (1000 files, 0 changed) < 200ms
 
@@ -450,21 +448,21 @@ Files: `resolver.hpp`, `resolver.cpp` + tests
 - [ ] Implement `ResolveContext` struct: manifest, lockfile, local overrides, workspace, no_local flag
 - [ ] Write tests (single dep, transitive, diamond, conflict, cycle, workspace, local override)
 
-### Phase 11: Blueprint Generation (with Target Filtering)
+### Phase 11: Filelist Generation (with Target Filtering)
 
-Files: `blueprint.hpp` + implementation + tests
+Files: `filelist.hpp` + implementation + tests
 
 Generates topologically-sorted file lists for EDA tools, now incorporating target expression filtering from Phase 2.
 
 - [ ] Build unit-level graph from parsed design units
 - [ ] Map units to files (file-level graph)
-- [ ] Integrate target filtering into blueprint pipeline:
+- [ ] Integrate target filtering into filelist pipeline:
   1. Parse `Loom.toml` → list of `SourceGroup` (each with optional `TargetExpr`)
   2. Resolve dependencies → full dep tree with all source groups
   3. Evaluate each `SourceGroup` against active target set → include or skip
   4. Parse included files → extract design units
   5. Build dependency graph → topological sort
-  6. Emit blueprint (ordered file list)
+  6. Emit filelist (ordered file list)
 - [ ] Implement topological sort of file graph
 - [ ] Implement output formats: standard file list (`.f`), JSON
 - [ ] Implement top-level module detection
@@ -481,7 +479,7 @@ Built-in drivers for 9 EDA tools plus a custom driver for arbitrary tools. Three
 
 - [ ] Define core data structures in `types.hpp`:
   - `SourceFile` — path, language (Verilog/SV), is_include_file, library
-  - `Blueprint` — name, top_module, files, include_dirs, defines, parameters, plusargs
+  - `Filelist` — name, top_module, files, include_dirs, defines, parameters, plusargs
   - `ToolAction` enum — Lint, Simulate, Synthesize, Build
   - `ToolResult` — exit_code, stdout/stderr logs, work_dir, waveform/artifact paths
   - `ToolOptions` — compile/elaborate/simulate/synth args, timescale, waveform config, device/family
@@ -656,9 +654,9 @@ Files: `cli.cpp`, `main.cpp`, `cmd_*.cpp`
   - `loom tree` — display dependency tree (annotates overridden sources)
   - `loom clean` — remove cache (`loom clean --all` removes `.loom/`)
 - [ ] Implement build commands:
-  - `loom build [--target <name>]` — generate blueprint + invoke EDA tool driver
+  - `loom build [--target <name>]` — generate filelist + invoke EDA tool driver
   - `loom test [--target <name>]` — simulation shortcut (equivalent to `loom build` with sim target)
-  - `loom plan [--target <targets>] [-o <file>]` — generate blueprint file without executing
+  - `loom plan [--target <targets>] [-o <file>]` — generate filelist without executing
   - `loom build -p <member>` — build specific workspace member
   - `loom build --all` — build all workspace members
   - `loom build -- <extra-args>` — pass-through to EDA tool
@@ -680,11 +678,11 @@ Files: `cli.cpp`, `main.cpp`, `cmd_*.cpp`
 - [ ] Implement fuzzy command suggestions (Levenshtein distance)
 - [ ] Write integration tests
 
-### Phase 16: Integration, DST, and Polish
+### Phase 16: Integration, Symbol Remapping, and Polish
 
-Files: `verilog_dst.cpp`, `sv_dst.cpp`, integration tests
+Files: `verilog_sr.cpp`, `sv_sr.cpp`, integration tests
 
-- [ ] Implement DST collision detection
+- [ ] Implement symbol remapping collision detection
 - [ ] Implement SHA-256-based name mangling
 - [ ] Implement token-stream identifier replacement
 - [ ] Create integration test workspace (multi-member, multi-dep)
