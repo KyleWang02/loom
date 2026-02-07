@@ -40,6 +40,9 @@ add_library(loom_core
     src/util/cache.cpp
     src/util/lockfile.cpp
     src/util/build_cache.cpp
+    src/util/project.cpp
+    src/util/workspace.cpp
+    src/util/local_override.cpp
 )
 target_include_directories(loom_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -107,6 +110,11 @@ loom_add_test(test_lockfile tests/test_lockfile.cpp)
 
 # Phase 8 tests
 loom_add_test(test_build_cache tests/test_build_cache.cpp)
+
+# Phase 9 tests
+loom_add_test(test_project tests/test_project.cpp)
+loom_add_test(test_workspace tests/test_workspace.cpp)
+loom_add_test(test_local_override tests/test_local_override.cpp)
 
 # Performance benchmarks
 loom_add_test(bench_lexer tests/bench_lexer.cpp)

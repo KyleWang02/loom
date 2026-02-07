@@ -40,10 +40,11 @@ Run the `/handoff` command at end of session. It:
 
 ## Current State
 
-- **Date**: 2026-02-06
-- **Phase**: Phases 0-4, 6 COMPLETE (incl. performance). Next: Phase 5 (Parser) + Phase 7 (Git Deps).
+- **Date**: 2026-02-07
+- **Phase**: Phases 0-8 COMPLETE. Next: Phase 9 (Workspace/Project/Local Overrides).
 - **Branch**: main
 - **Blockers**: None
-- **Tests**: 250 functional + 6 benchmarks across 16 suites. ASan/UBSan clean.
+- **Tests**: 275+ assertions across 21 test executables (18 suites + 3 benchmarks). ASan/UBSan clean.
 - **Performance**: Lexer 17ms/10K lines, Graph <1ms/10K nodes
+- **Dependencies**: SQLite 3.45.0 amalgamation in `third_party/sqlite3/`
 - **Terminology**: "Filelist" (not Blueprint), "Symbol Remapping/SR" (not DST)

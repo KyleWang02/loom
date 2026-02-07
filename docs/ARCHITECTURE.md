@@ -57,11 +57,22 @@ include/loom/
     lexer.hpp               LexResult struct (tokens + comments), lex() function.
                             is_sv flag gates SV keyword recognition.
 
-  git.hpp                   (planned) GitCli class. Subprocess wrapper for git operations.
-  cache_git.hpp             (planned) CacheManager for git deps. Two-tier cache.
-  lockfile.hpp              (planned) Loom.lock TOML format. LockedPackage, LockFile.
+  git.hpp                   GitCli class. Subprocess wrapper for git operations.
+                            check_version, ls_remote, clone_bare, fetch, checkout,
+                            resolve_ref, show_file. run_command() with timeout.
+  cache.hpp                 CacheManager for git deps. Two-tier cache:
+                            bare repos in ~/.loom/cache/git/db/, working trees in
+                            checkouts/. ensure_bare_repo, ensure_checkout, compute_checksum.
+  lockfile.hpp              Loom.lock TOML format. LockedPackage, LockFile.
+                            load(), save(), is_stale(), find().
 
-  cache.hpp                 (planned) SQLite-based incremental build cache.
+  build_cache.hpp           BuildCache class with pImpl pattern. SQLite-backed
+                            incremental build cache in .loom/cache/loom_cache.db.
+                            6 tables: schema_info, file_stat, parse_result,
+                            include_dep, dep_edge, filelist. Custom binary
+                            serialization (LPR\x01 magic + varint encoding).
+                            14 prepared statements. WAL mode. Stat-based fast path.
+                            compute_effective_hash(), compute_filelist_key().
 
   workspace.hpp             (planned) Workspace class. Member discovery, config inheritance.
   project.hpp               (planned) Project detection, loading, source file collection.
@@ -95,11 +106,15 @@ src/lang/
                             (decimal/hex/binary/octal/real/x-z), strings, directives,
                             escaped identifiers, line/block/doc/suppression comments,
                             multi-char operators (<=, ==, ===, <<, >>, ->, =>, etc.).
+  parser.cpp                Verilog/SV parser. Extracts DesignUnit structs with ports,
+                            params, instantiations, imports, always blocks, case
+                            statements, signals, generate blocks, labeled blocks.
+                            Error recovery. Produces ParseResult.
 
 third_party/
   catch2/catch.hpp          Catch2 v2.13.10 single header.
   tomlplusplus/toml.hpp     toml++ v3.4.0 single header (~17,748 lines).
-  sqlite3/                  (planned) SQLite amalgamation.
+  sqlite3/sqlite3.{h,c}    SQLite v3.45.0 amalgamation. Built as static C library.
 
 tests/
   test_main.cpp             Catch2 CATCH_CONFIG_MAIN. Compiled once, linked to all tests.
@@ -117,8 +132,16 @@ tests/
   test_config.cpp           12 cases: parsing, merge, effective config, boolean tracking.
   test_lexer.cpp            30 cases: all token types, comments, operators, fixtures, edge cases.
   test_graph.cpp            27 cases: basic ops, topo sort, cycles, DFS, tree display, GraphMap.
+  test_parser.cpp           Parser tests: module/package/interface extraction, ports, params,
+                            instantiations, always blocks, case statements, signals, generates.
+  test_git.cpp              GitCli tests: version check, ls_remote, cache directory naming.
+  test_lockfile.cpp         Lockfile tests: roundtrip, staleness detection, find.
+  test_build_cache.cpp      25 cases: stat cache, parse roundtrip (empty, full, nested),
+                            include/edge tracking, filelist cache, hash helpers,
+                            prune, clear, stats, schema migration, corruption recovery.
   bench_lexer.cpp           2 benchmarks: 10K lines <100ms (17ms), 50K lines <500ms (71ms).
   bench_graph.cpp           4 benchmarks: 10K nodes topo/cycle/GraphMap all <50ms (<1ms).
+  bench_parser.cpp          Parser performance benchmark.
   fixtures/
     simple_module.v         8-bit counter. Used by SHA-256 file hash test.
     counter.v               Verilog module with doc comments, suppression, params, always block.
@@ -153,11 +176,20 @@ graph.hpp   ──depends on──> result.hpp
 lang/token.hpp ──standalone──
 lang/verilog_token.hpp ──standalone──
 lang/lexer.hpp ──depends on──> token.hpp, verilog_token.hpp, result.hpp
+lang/ir.hpp ──depends on──> token.hpp (for SourcePos)
+lang/parser.hpp ──depends on──> ir.hpp, lexer.hpp, result.hpp
+git.hpp ──depends on──> result.hpp
+cache.hpp ──depends on──> result.hpp, git.hpp, sha256.hpp
+lockfile.hpp ──depends on──> result.hpp, version.hpp, name.hpp
+build_cache.hpp ──depends on──> result.hpp, ir.hpp (pImpl hides sqlite3.h)
 
 All src/*.cpp include their corresponding header.
 All tests link against loom_core (static lib) + catch2_main (object lib).
+loom_core links against sqlite3 (static C lib).
 manifest.cpp uses third_party/tomlplusplus/toml.hpp.
 config.cpp uses third_party/tomlplusplus/toml.hpp.
+lockfile.cpp uses third_party/tomlplusplus/toml.hpp.
+build_cache.cpp uses third_party/sqlite3/sqlite3.h (internal only, not in public header).
 ```
 
 ## Key Patterns

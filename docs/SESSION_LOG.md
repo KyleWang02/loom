@@ -3,84 +3,51 @@
 <!-- This file contains ONLY the most recent session. -->
 <!-- Previous sessions are in docs/ARCHIVE.md (cold storage). -->
 
-## 2026-02-06 (Session 7)
+## 2026-02-07 (Session 8)
 
-**Focus**: Phases 2-4, 6 implementation + performance verification
+**Focus**: Phase 8 — Incremental Build Cache (SQLite)
 
 **Completed**:
-- **Phase 2 — Target Expression Parser**: Implemented `target_expr.hpp/cpp` with recursive descent parser, evaluator, `TargetSet`, `SourceGroup`, `filter_source_groups()`. 26 tests passing.
-- **Phase 3 — Manifest, Configuration, Versioning**: Implemented 5 modules:
-  - `version.hpp/cpp` — Version, PartialVersion, semver constraints (22 tests)
-  - `name.hpp/cpp` — PkgName validation and normalization (11 tests)
-  - `source.hpp/cpp` — GitSource, PathSource, Dependency with validation (15 tests)
-  - `manifest.hpp/cpp` — Full Loom.toml parsing via toml++ (18 tests)
-  - `config.hpp/cpp` — Layered config with merge rules (12 tests)
-  - Added toml++ v3.4.0 single header to `third_party/tomlplusplus/`
-- **Phase 4 — Verilog/SystemVerilog Lexer**: Implemented 3 headers + lexer:
-  - `token.hpp` — SourcePos, Token<T> template, Comment struct
-  - `verilog_token.hpp` — VerilogTokenType enum (~90 variants), keyword lookup
-  - `lexer.hpp/cpp` — ~450-line state machine lexer (30 tests)
-  - Test fixtures: `counter.v`, `package_example.sv`
-- **Phase 6 — Graph Data Structures**: Header-only `graph.hpp` (~285 lines):
-  - `Graph<NodeData, EdgeData>` with adjacency list, Kahn's topo sort, cycle detection, DFS, tree display
-  - `GraphMap<EdgeData>` string-keyed wrapper (27 tests)
-- **Performance benchmarks** (Release mode):
-  - Lexer: 10K lines in 17ms (<100ms target), 50K lines in 71ms (<500ms target)
-  - Graph: 10K-node topo sort <1ms, cycle detection <1ms, GraphMap topo sort 1ms (all <50ms target)
-- All 16 test suites pass (250 functional tests + 6 benchmarks), ASan/UBSan clean
+- **Phase 8 — Incremental Build Cache**: Full SQLite-backed build cache implementation:
+  - Downloaded SQLite amalgamation v3.45.0 to `third_party/sqlite3/`
+  - `build_cache.hpp` — `BuildCache` class with pImpl pattern (sqlite3.h never leaks into public header)
+  - `build_cache.cpp` — ~660 lines: schema init, stat cache, binary serialization, parse cache, include/edge tracking, filelist cache, hash computation helpers, maintenance operations
+  - 6 SQLite tables: `schema_info`, `file_stat`, `parse_result`, `include_dep`, `dep_edge`, `filelist`
+  - Custom binary serialization with `LPR\x01` magic, varint encoding (~3-5x smaller than JSON)
+  - 14 prepared statements cached for performance
+  - WAL mode + synchronous=NORMAL for concurrent reader safety
+  - Stat-based fast path: POSIX `stat()` checks inode/mtime/size before falling back to SHA256
+  - Corruption recovery: detects corrupt DB on open, deletes and recreates automatically
+  - Schema migration: version check on open, clears data if version mismatches
+  - `compute_effective_hash()` and `compute_filelist_key()` for 4-layer hash strategy
+  - 25 test cases (199 assertions), all passing, ASan/UBSan clean
+- All 21 test executables pass (275+ total assertions including new build cache tests)
 
 **Key Decisions**:
-- Single `VerilogTokenType` enum for both Verilog and SV (gated by `is_sv` flag) rather than separate enums
-- `Graph` is header-only template — avoids explicit instantiation complexity
-- `GraphMap` uses idempotent `add_node` and auto-creating `add_edge` for ergonomic API
-- Config merge uses explicit `_set` tracking flags to avoid false overrides of boolean defaults
+- Named `BuildCache` (not `Cache`) to avoid conflict with existing `CacheManager` in `cache.hpp` (git cache)
+- pImpl pattern keeps `sqlite3.h` out of public header — users never see SQLite types
+- SourcePos.file skipped in serialization (redundant — all units share the same file from cache key context)
+- Filelist stored as comma-separated strings (no JSON dependency needed)
+- Schema migration strategy: clear + re-init (cache is ephemeral, data loss is acceptable)
 
 **Issues & Fixes**:
-- Raw string literal `R"(...)"` broke on TOML containing `)` → fixed with `R"TOML(...)TOML"` delimiter
-- Config merge blindly overwrote `build.pre_lint`/`build.lint_fatal` booleans → added `build_pre_lint_set`/`build_lint_fatal_set` tracking flags
-- Lexer benchmark generated 9,200 lines (short of 10K) → increased module count from 200 to 220
+- `SCHEMA_VERSION` string concatenation inside `LOOM_TRY` macro caused preprocessor confusion → built SQL string before calling `LOOM_TRY`
+- `sqlite3_open` succeeds even on corrupt files (corruption only detected on use) → unified PRAGMA + schema init into single lambda, recovery on any failure
+- Test needed `<unistd.h>` for `getpid()` and `<sqlite3.h>` for schema migration test
 
-**Checkpoint Status**: Phases 0-4 and 6 complete with performance verified. Phase 5 is next (parser depends on Phase 4 lexer).
+**Checkpoint Status**: Phases 0-8 complete. All tests pass under ASan/UBSan.
 
 **Next**:
-1. Phase 5: Verilog/SystemVerilog Parser and Design Unit Extraction
-2. Phase 7: Git Dependencies and Cache Manager (can parallelize with Phase 5)
-3. Phase 8: Incremental Build Cache (SQLite)
-4. Phase 9: Workspace, Project Model, and Local Overrides (after Phases 3+7)
+1. Phase 9: Workspace, Project Model, and Local Overrides (depends on Phases 3+7, both done)
+2. Phase 10: Dependency Resolution and Lockfile (depends on Phases 7+9)
+3. Phase 11: Filelist Generation with Target Filtering (depends on Phases 5+6+10)
+4. Phase 13: Lint Engine (depends on Phase 5, which is done)
+5. Phase 14: Documentation Generation (depends on Phase 5, which is done)
 
 **Files Changed**:
-- `include/loom/target_expr.hpp` (new)
-- `src/util/target_expr.cpp` (new)
-- `tests/test_target_expr.cpp` (new)
-- `include/loom/version.hpp` (new)
-- `src/util/version.cpp` (new)
-- `tests/test_version.cpp` (new)
-- `include/loom/name.hpp` (new)
-- `src/util/name.cpp` (new)
-- `tests/test_name.cpp` (new)
-- `include/loom/source.hpp` (new)
-- `src/util/source.cpp` (new)
-- `tests/test_source.cpp` (new)
-- `include/loom/manifest.hpp` (new)
-- `src/util/manifest.cpp` (new)
-- `tests/test_manifest.cpp` (new)
-- `include/loom/config.hpp` (new)
-- `src/util/config.cpp` (new)
-- `tests/test_config.cpp` (new)
-- `include/loom/lang/token.hpp` (new)
-- `include/loom/lang/verilog_token.hpp` (new)
-- `include/loom/lang/lexer.hpp` (new)
-- `src/lang/lexer.cpp` (new)
-- `tests/test_lexer.cpp` (new)
-- `include/loom/graph.hpp` (new)
-- `tests/test_graph.cpp` (new)
-- `tests/bench_lexer.cpp` (new)
-- `tests/bench_graph.cpp` (new)
-- `tests/fixtures/counter.v` (new)
-- `tests/fixtures/package_example.sv` (new)
-- `tests/fixtures/Loom.toml.example` (new)
-- `tests/fixtures/workspace.toml.example` (new)
-- `third_party/tomlplusplus/toml.hpp` (new — toml++ v3.4.0)
-- `CMakeLists.txt` (modified — added all sources, tests, benchmarks)
-- `docs/PLAN.md` (modified — checked off Phases 2-4, 6 + performance items)
-- `CLAUDE.md` (modified — updated current state)
+- `third_party/sqlite3/sqlite3.h` (new — SQLite v3.45.0 amalgamation header)
+- `third_party/sqlite3/sqlite3.c` (new — SQLite v3.45.0 amalgamation source)
+- `include/loom/build_cache.hpp` (new — BuildCache class with pImpl, 97 lines)
+- `src/util/build_cache.cpp` (new — full implementation, ~660 lines)
+- `tests/test_build_cache.cpp` (new — 25 test cases, ~820 lines)
+- `CMakeLists.txt` (modified — added C language, sqlite3 static lib, build_cache.cpp, test target)
