@@ -74,11 +74,16 @@ include/loom/
                             14 prepared statements. WAL mode. Stat-based fast path.
                             compute_effective_hash(), compute_filelist_key().
 
-  workspace.hpp             (planned) Workspace class. Member discovery, config inheritance.
-  project.hpp               (planned) Project detection, loading, source file collection.
-  local_override.hpp        (planned) Loom.local parser. Bypasses lockfile.
+  workspace.hpp             Workspace class. discover(), load(), expand_member_globs(),
+                            find_member(), resolve_targets(), resolve_workspace_dep(),
+                            resolve_member_dep(), effective_config(), validate().
+  project.hpp               Project detection, loading, source file collection.
+  local_override.hpp        Loom.local parser. OverrideSource (Path/Git), LocalOverrides.
+                            load(), parse(), validate(), warn_active(), discover_local_overrides().
 
-  resolver.hpp              (planned) DependencyResolver. BFS resolution, conflict detection.
+  resolver.hpp              DependencyResolver class. BFS resolution, conflict detection.
+                            resolve(), update(), resolve_workspace(), apply_overrides(),
+                            topological_sort(). ResolveOptions, ResolvedPackage structs.
 
   filelist.hpp              (planned) Filelist generation with target filtering.
 
@@ -100,6 +105,10 @@ src/util/
   source.cpp                Dependency::validate() with mutual exclusivity checks. ~80 lines.
   manifest.cpp              Full Loom.toml parsing via toml++. ~400 lines.
   config.cpp                Config parsing, merge logic, global_config_path(). ~200 lines.
+  workspace.cpp             Workspace discovery, loading, member expansion, config inheritance. ~415 lines.
+  local_override.cpp        Loom.local TOML parser, validation, discovery. ~185 lines.
+  project.cpp               Project detection, loading, checksum. ~140 lines.
+  resolver.cpp              BFS dependency resolution, git/path resolution, lockfile building. ~396 lines.
 
 src/lang/
   lexer.cpp                 ~450-line state machine. Handles identifiers, numbers
@@ -139,6 +148,13 @@ tests/
   test_build_cache.cpp      25 cases: stat cache, parse roundtrip (empty, full, nested),
                             include/edge tracking, filelist cache, hash helpers,
                             prune, clear, stats, schema migration, corruption recovery.
+  test_project.cpp          Project detection, loading, source collection.
+  test_workspace.cpp        Workspace discovery, member expansion, config inheritance,
+                            resolve_targets, resolve_workspace_dep, resolve_member_dep.
+  test_local_override.cpp   Loom.local parsing, validation, discovery, suppression.
+  test_resolver.cpp         26 cases: single dep (tag/version/rev/branch/path), transitive
+                            (two-level, diamond, deep chain, mixed), lockfile reuse/stale,
+                            selective update, conflict detection, overrides, topo sort, edge cases.
   bench_lexer.cpp           2 benchmarks: 10K lines <100ms (17ms), 50K lines <500ms (71ms).
   bench_graph.cpp           4 benchmarks: 10K nodes topo/cycle/GraphMap all <50ms (<1ms).
   bench_parser.cpp          Parser performance benchmark.
@@ -180,7 +196,10 @@ lang/ir.hpp ──depends on──> token.hpp (for SourcePos)
 lang/parser.hpp ──depends on──> ir.hpp, lexer.hpp, result.hpp
 git.hpp ──depends on──> result.hpp
 cache.hpp ──depends on──> result.hpp, git.hpp, sha256.hpp
-lockfile.hpp ──depends on──> result.hpp, version.hpp, name.hpp
+lockfile.hpp ──depends on──> result.hpp, source.hpp
+workspace.hpp ──depends on──> result.hpp, manifest.hpp, config.hpp
+local_override.hpp ──depends on──> result.hpp
+resolver.hpp ──depends on──> result.hpp, cache.hpp, manifest.hpp, lockfile.hpp, workspace.hpp, local_override.hpp, graph.hpp
 build_cache.hpp ──depends on──> result.hpp, ir.hpp (pImpl hides sqlite3.h)
 
 All src/*.cpp include their corresponding header.
@@ -189,7 +208,9 @@ loom_core links against sqlite3 (static C lib).
 manifest.cpp uses third_party/tomlplusplus/toml.hpp.
 config.cpp uses third_party/tomlplusplus/toml.hpp.
 lockfile.cpp uses third_party/tomlplusplus/toml.hpp.
+local_override.cpp uses third_party/tomlplusplus/toml.hpp.
 build_cache.cpp uses third_party/sqlite3/sqlite3.h (internal only, not in public header).
+resolver.cpp uses cache.hpp, git.hpp, manifest.hpp, lockfile.hpp, workspace.hpp, local_override.hpp, graph.hpp.
 ```
 
 ## Key Patterns

@@ -23,9 +23,9 @@ See `CLAUDE.md` "Checkpoint Workflow" section for full details.
 - [x] Phase 6: Graph Data Structures and Algorithms ← DONE
 - [x] Phase 7: Git Dependencies and Cache Manager ← DONE
 - [x] Phase 8: Incremental Build Cache (SQLite) ← DONE
-- [ ] Phase 9: Workspace, Project Model, and Local Overrides ← NEXT UP
-- [ ] Phase 10: Dependency Resolution and Lockfile
-- [ ] Phase 11: Filelist Generation (with Target Filtering)
+- [x] Phase 9: Workspace, Project Model, and Local Overrides ← DONE
+- [x] Phase 10: Dependency Resolution and Lockfile ← DONE
+- [ ] Phase 11: Filelist Generation (with Target Filtering) ← NEXT UP
 - [ ] Phase 12: EDA Tool Drivers
 - [ ] Phase 13: Lint Engine
 - [ ] Phase 14: Documentation Generation
@@ -368,9 +368,9 @@ Combines workspace discovery, project model, and `Loom.local` override mechanism
 
 Based on Cargo workspaces. Virtual and root-package workspace types. Single `Loom.lock` at root.
 
-- [ ] Implement `WorkspaceMember` struct: name, version, manifest_path, root_dir, parsed manifest
-- [ ] Implement `WorkspaceConfig` struct: shared dependencies, lint config, target configs
-- [ ] Implement `Workspace` class:
+- [x] Implement `WorkspaceMember` struct: name, version, manifest_path, root_dir, parsed manifest
+- [x] Implement `WorkspaceConfig` struct: shared dependencies, lint config, target configs
+- [x] Implement `Workspace` class:
   - `discover(start_dir)` — walk up from cwd, find `Loom.toml` with `[workspace]`
   - `load(workspace_root)` — load root manifest + expand member globs
   - `expand_member_globs()` — resolve `members = ["ip/*"]` patterns using loom::glob
@@ -382,7 +382,7 @@ Based on Cargo workspaces. Virtual and root-package workspace types. Single `Loo
   - `build_dependency_graph()` — unified graph for multiple members with conflict detection
   - `effective_config()` — merge workspace config with member overrides (member wins)
   - `validate()` — no duplicate names, no nested workspaces, no member-level lock files
-- [ ] Implement `is_workspace_root()` and `find_manifest()` free functions
+- [x] Implement `is_workspace_root()` and `find_manifest()` free functions
 
 **Workspace Loom.toml syntax**:
 ```toml
@@ -397,29 +397,29 @@ common_cells = { git = "...", tag = "v1.37.0" }
 
 #### 9b: Project Model
 
-- [ ] Implement project detection (walk up for `Loom.toml`)
-- [ ] Implement project loading and checksum
-- [ ] Implement source file collection from `[[sources]]` groups with target filtering
+- [x] Implement project detection (walk up for `Loom.toml`)
+- [x] Implement project loading and checksum
+- [x] Implement source file collection from `[[sources]]` groups with target filtering
 
 #### 9c: Local Overrides (Loom.local)
 
 Based on Bender.local and Cargo [patch]. Overrides bypass lockfile without modifying it.
 
-- [ ] Define `OverrideSource` struct: `Kind::Path` or `Kind::Git` with url/branch/tag/rev
-- [ ] Implement `LocalOverrides` struct:
+- [x] Define `OverrideSource` struct: `Kind::Path` or `Kind::Git` with url/branch/tag/rev
+- [x] Implement `LocalOverrides` struct:
   - `load(local_file)` — parse `Loom.local` TOML
   - `has_override()` / `get_override()` / `count()` / `empty()`
   - `validate()` — path exists and contains `Loom.toml`, git URL non-empty
   - `warn_active()` — emit warning banner via `loom::log::warn`
-- [ ] Implement `discover_local_overrides(project_root)` — returns empty (not error) if no file
-- [ ] Implement override application rules:
+- [x] Implement `discover_local_overrides(project_root)` — returns empty (not error) if no file
+- [x] Implement override application rules:
   - `loom lock`: Loom.local is IGNORED (warning printed), lockfile reflects Loom.toml only
   - `loom build`/`plan`/`tree`/`get`: overrides applied, replace locked sources
   - `--no-local` flag and `LOOM_NO_LOCAL=1` env var suppress overrides
   - Nested override's own `Loom.local` is silently ignored (only main project overrides apply)
   - Version mismatch between override and declared dep: warning, not error
 - [ ] Add `Loom.local` to generated `.gitignore` in `loom init`/`loom new`
-- [ ] Write tests: parsing, validation, warning output, lock interaction, override application
+- [x] Write tests: parsing, validation, warning output, lock interaction, override application
 
 **Loom.local syntax**:
 ```toml
@@ -432,7 +432,7 @@ common_cells = { git = "git@github.com:user/common_cells.git", branch = "fix-mux
 
 Files: `resolver.hpp`, `resolver.cpp` + tests
 
-- [ ] Implement `DependencyResolver` class:
+- [x] Implement `DependencyResolver` class:
   - `resolve(manifest)` — full resolution from manifest, producing lockfile
   - `update(manifest, existing_lock, package_name)` — selective re-resolution
   - `resolve_git()` — resolve a single git dependency to commit SHA
@@ -440,13 +440,13 @@ Files: `resolver.hpp`, `resolver.cpp` + tests
   - `discover_versions()` — list semver tags from remote
   - `load_remote_manifest()` — read `Loom.toml` from commit via `git show`
   - `topological_sort()` — order resolved packages, detect cycles
-- [ ] Implement BFS resolution algorithm with constraint checking
-- [ ] Implement conflict detection (two dependents requiring incompatible versions)
-- [ ] Implement lockfile staleness detection (deps changed, source/constraint changed)
-- [ ] Integrate with `LocalOverrides` — apply overrides after lockfile load
-- [ ] Integrate with `Workspace` — unified resolution across workspace members
-- [ ] Implement `ResolveContext` struct: manifest, lockfile, local overrides, workspace, no_local flag
-- [ ] Write tests (single dep, transitive, diamond, conflict, cycle, workspace, local override)
+- [x] Implement BFS resolution algorithm with constraint checking
+- [x] Implement conflict detection (two dependents requiring incompatible versions)
+- [x] Implement lockfile staleness detection (deps changed, source/constraint changed)
+- [x] Integrate with `LocalOverrides` — apply overrides after lockfile load
+- [x] Integrate with `Workspace` — unified resolution across workspace members
+- [x] Implement `ResolveOptions` struct: no_local, offline, update_all, update_package
+- [x] Write tests (single dep, transitive, diamond, conflict, cycle, workspace, local override)
 
 ### Phase 11: Filelist Generation (with Target Filtering)
 
