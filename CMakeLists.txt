@@ -27,6 +27,9 @@ add_library(loom_core
     src/util/config.cpp
     src/lang/lexer.cpp
     src/lang/parser.cpp
+    src/util/git.cpp
+    src/util/cache.cpp
+    src/util/lockfile.cpp
 )
 target_include_directories(loom_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -40,6 +43,9 @@ target_include_directories(loom_core PUBLIC
 # Demo programs (for manual real-world testing)
 add_executable(demo_errors demos/demo_errors.cpp)
 target_link_libraries(demo_errors loom_core)
+
+add_executable(loom-dump demos/demo_dump.cpp)
+target_link_libraries(loom-dump loom_core)
 
 # Testing
 enable_testing()
@@ -83,6 +89,10 @@ loom_add_test(test_graph tests/test_graph.cpp)
 
 # Phase 5 tests
 loom_add_test(test_parser tests/test_parser.cpp)
+
+# Phase 7 tests
+loom_add_test(test_git tests/test_git.cpp)
+loom_add_test(test_lockfile tests/test_lockfile.cpp)
 
 # Performance benchmarks
 loom_add_test(bench_lexer tests/bench_lexer.cpp)
