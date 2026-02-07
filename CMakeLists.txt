@@ -87,3 +87,4 @@ loom_add_test(test_parser tests/test_parser.cpp)
 # Performance benchmarks
 loom_add_test(bench_lexer tests/bench_lexer.cpp)
 loom_add_test(bench_graph tests/bench_graph.cpp)
+loom_add_test(bench_parser tests/bench_parser.cpp)

@@ -171,7 +171,9 @@ struct Parser {
         advance(); // consume module/package/interface/class/program keyword
 
         // Optional: automatic/static lifetime qualifier
-        if (check(TT::KwAutomatic) || check(TT::KwStatic)) {
+        // Note: in Verilog mode, these are lexed as identifiers
+        if (check(TT::KwAutomatic) || check(TT::KwStatic) ||
+            (check(TT::Identifier) && (peek().text == "automatic" || peek().text == "static"))) {
             advance();
         }
 

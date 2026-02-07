@@ -4,7 +4,7 @@
 
 Loom is a package manager and build system for Verilog and SystemVerilog, written in C++17. It manages reusable HDL IP cores across projects, resolves transitive dependencies, generates topologically-sorted file lists (Filelists) for EDA tools, handles namespace collisions via Symbol Remapping (SR), and integrates with arbitrary EDA backends via configurable Targets.
 
-Always make use of subagent workflows
+Always make use of subagent to optimize workflow, including research, implementation, and organization
 
 **Language**: C++17 only. No VHDL support.
 **Supported HDL**: Verilog (.v, .vl, .vlg) and SystemVerilog (.sv)
@@ -28,18 +28,6 @@ Always make use of subagent workflows
 - **Memory**: RAII + `std::unique_ptr`, no raw `new`/`delete`
 - **Tests**: Catch2 single-header. Fixtures via `LOOM_SOURCE_DIR` env var.
 - **Build**: CMake 3.16+. `cmake --build build && ctest --test-dir build --output-on-failure`
-
-## Checkpoint Workflow
-
-Each phase uses a strict implement → test → review loop:
-
-1. **Implement** a testable chunk → **STOP** → present test plan to user
-2. User approves → **write & run tests** → fix failures
-3. **STOP** → present review (results, run commands) → user runs tests
-4. User confirms → proceed to next chunk or phase
-5. Between phases: all tests green, user confirms, run `/handoff`
-
-**Nothing proceeds without user approval.**
 
 ## Handoff
 
