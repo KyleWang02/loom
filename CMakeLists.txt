@@ -1,11 +1,20 @@
 cmake_minimum_required(VERSION 3.16)
-project(loom VERSION 0.1.0 LANGUAGES CXX)
+project(loom VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# SQLite3 (amalgamation, built as static C library)
+add_library(sqlite3 STATIC third_party/sqlite3/sqlite3.c)
+target_include_directories(sqlite3 PUBLIC third_party/sqlite3)
+set_target_properties(sqlite3 PROPERTIES C_STANDARD 99)
+target_compile_definitions(sqlite3 PRIVATE
+    SQLITE_THREADSAFE=1
+    SQLITE_OMIT_LOAD_EXTENSION=1
+)
 
 # Include paths
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -30,11 +39,13 @@ add_library(loom_core
     src/util/git.cpp
     src/util/cache.cpp
     src/util/lockfile.cpp
+    src/util/build_cache.cpp
 )
 target_include_directories(loom_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/third_party
 )
+target_link_libraries(loom_core sqlite3)
 
 # Main executable (uncomment when CLI is ready)
 # add_executable(loom src/main.cpp src/cli.cpp)
@@ -93,6 +104,9 @@ loom_add_test(test_parser tests/test_parser.cpp)
 # Phase 7 tests
 loom_add_test(test_git tests/test_git.cpp)
 loom_add_test(test_lockfile tests/test_lockfile.cpp)
+
+# Phase 8 tests
+loom_add_test(test_build_cache tests/test_build_cache.cpp)
 
 # Performance benchmarks
 loom_add_test(bench_lexer tests/bench_lexer.cpp)
