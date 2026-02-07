@@ -53,8 +53,9 @@ Run the `/handoff` command at end of session. It:
 ## Current State
 
 - **Date**: 2026-02-06
-- **Phase**: Phase 4 — Lexer COMPLETE. Ready for Phase 5/6+.
+- **Phase**: Phases 0-4, 6 COMPLETE (incl. performance). Next: Phase 5 (Parser) + Phase 7 (Git Deps).
 - **Branch**: main
 - **Blockers**: None
-- **Tests**: 223 passing across 13 suites
+- **Tests**: 250 functional + 6 benchmarks across 16 suites. ASan/UBSan clean.
+- **Performance**: Lexer 17ms/10K lines, Graph <1ms/10K nodes
 - **Terminology**: "Filelist" (not Blueprint), "Symbol Remapping/SR" (not DST)

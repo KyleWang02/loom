@@ -23,126 +23,115 @@ include/loom/
                             swap_template_lenient. \{{ escape. Used by EDA drivers
                             (Phase 12) and doc templates (Phase 14).
 
-  target_expr.hpp           (planned) TargetExpr class. Boolean filter expressions:
+  target_expr.hpp           TargetExpr class. Boolean filter expressions:
                             all(), any(), not(), bare identifiers, * wildcard.
-                            Recursive descent parser + evaluator.
-  source_group.hpp          (planned) SourceGroup struct. Files + optional TargetExpr +
-                            include_dirs + defines. filter_source_groups().
+                            Recursive descent parser + evaluator. TargetSet typedef.
+                            SourceGroup struct + filter_source_groups().
 
-  version.hpp               (planned) Version (major.minor.micro + label), PartialVersion,
-                            semver constraint parsing (^, ~, >=, <, ranges).
-  name.hpp                  (planned) PkgName validation and normalization.
-  manifest.hpp              (planned) Manifest (Loom.toml) parser. [package], [dependencies],
-                            [[sources]], [lint], [workspace], [targets.*], [build].
-  config.hpp                (planned) Config with layered loading (global > workspace > local).
+  version.hpp               Version (major.minor.micro + label), PartialVersion,
+                            ConstraintOp enum, VersionConstraint, VersionReq.
+                            Semver constraint parsing (^, ~, >=, <, ranges).
+  name.hpp                  PkgName validation ([a-zA-Z][a-zA-Z0-9_-]*) and
+                            normalization (lowercase + hyphens to underscores).
+  source.hpp                GitSource, PathSource, Dependency structs.
+                            Validation: mutual exclusivity, exactly-one-of rules.
+  manifest.hpp              Manifest (Loom.toml) parser via toml++. PackageInfo,
+                            TargetConfig, LintConfig, BuildConfig, WorkspaceConfig.
+                            Parses [package], [dependencies], [[sources]], [lint],
+                            [workspace], [targets.*], [build].
+  config.hpp                Config with layered loading (global > workspace > local).
+                            merge() with explicit _set tracking for boolean fields.
 
-  git.hpp                   (planned) GitCli class. Subprocess wrapper for git operations:
-                            ls_remote, clone_bare, fetch, checkout, resolve_ref, show_file.
-  source.hpp                (planned) DependencySource variant: GitSource | PathSource.
-                            GitSource: url + tag/version/rev/branch.
-  cache_git.hpp             (planned) CacheManager for git deps. Two-tier cache:
-                            bare repos in ~/.loom/cache/git/db/,
-                            checkouts in ~/.loom/cache/git/checkouts/.
+  graph.hpp                 Header-only. Graph<NodeData, EdgeData> with adjacency list.
+                            Kahn's topological sort, minimal topo sort from root,
+                            has_cycle(), DFS, tree_display with box-drawing chars.
+                            GraphMap<EdgeData> string-keyed wrapper.
+
+  lang/
+    token.hpp               SourcePos (file, line, col), Token<T> template,
+                            CommentKind enum (Line, Block, Doc, Suppression),
+                            Comment struct with kind + text + position.
+    verilog_token.hpp       VerilogTokenType enum (~90 variants: Verilog keywords,
+                            SV keywords, operators, literals, special).
+                            verilog_keywords() lookup, verilog_token_name().
+    lexer.hpp               LexResult struct (tokens + comments), lex() function.
+                            is_sv flag gates SV keyword recognition.
+
+  git.hpp                   (planned) GitCli class. Subprocess wrapper for git operations.
+  cache_git.hpp             (planned) CacheManager for git deps. Two-tier cache.
   lockfile.hpp              (planned) Loom.lock TOML format. LockedPackage, LockFile.
 
   cache.hpp                 (planned) SQLite-based incremental build cache.
-                            file_stat, parse_result, include_dep, dep_edge, filelist tables.
-                            4-layer hashing: content → parse → effective → filelist.
-                            Stat-based fast path (inode + mtime + size).
 
-  workspace.hpp             (planned) Workspace class. Virtual and root-package types.
-                            Member discovery via glob, single Loom.lock, config inheritance.
+  workspace.hpp             (planned) Workspace class. Member discovery, config inheritance.
   project.hpp               (planned) Project detection, loading, source file collection.
-  local_override.hpp        (planned) Loom.local parser. OverrideSource (path/git).
-                            Bypasses lockfile without modifying it.
+  local_override.hpp        (planned) Loom.local parser. Bypasses lockfile.
 
-  resolver.hpp              (planned) DependencyResolver. BFS resolution, conflict detection,
-                            semver tag matching, workspace integration.
+  resolver.hpp              (planned) DependencyResolver. BFS resolution, conflict detection.
 
   filelist.hpp              (planned) Filelist generation with target filtering.
-                            Topological sort, top-module detection, testbench heuristic.
 
-  target/
-    types.hpp               (planned) Filelist, SourceFile, ToolAction, ToolResult, ToolOptions.
-    tool_driver.hpp         (planned) ToolDriver abstract base class + registry.
-    driver_icarus.hpp       (planned) Icarus Verilog: iverilog/vvp.
-    driver_verilator.hpp    (planned) Verilator: lint + simulate.
-    driver_vivado_sim.hpp   (planned) Vivado Simulator: xvlog/xelab/xsim.
-    driver_vivado_synth.hpp (planned) Vivado Synthesis: TCL batch.
-    driver_quartus.hpp      (planned) Intel Quartus Prime: TCL.
-    driver_modelsim.hpp     (planned) ModelSim/QuestaSim: TCL + DO.
-    driver_vcs.hpp          (planned) Synopsys VCS: file list.
-    driver_xcelium.hpp      (planned) Cadence Xcelium: xrun.
-    driver_yosys.hpp        (planned) Yosys: .ys script.
-    driver_custom.hpp       (planned) Custom: user-defined commands with {{ }} substitution.
-
-  lint/
-    lint_rule.hpp           (planned) LintRule base class, Severity enum, Diagnostic struct.
-    lint_engine.hpp         (planned) LintEngine: load config, run rules, collect diagnostics.
-    lint_config.hpp         (planned) LintConfig: parse [lint] from Loom.toml.
-    lint_suppression.hpp    (planned) SuppressionMap: // loom: ignore[rule-id] comments.
-    rules/                  (planned) 22 rules: 11 correctness, 8 structure, 3 style.
-
-  doc/
-    doc_comment.hpp         (planned) DocTag, DocComment structs. /// comment parsing.
-    doc_model.hpp           (planned) DocModel IR: PortDoc, ParamDoc, DesignUnitDoc, CrossRef.
-    doc_extractor.hpp       (planned) DocExtractor: walk tokens, associate comments with units.
-    renderer.hpp            (planned) Renderer base class + RenderConfig.
-    markdown_renderer.hpp   (planned) Markdown output with Mermaid dependency graphs.
-    html_renderer.hpp       (planned) Static HTML site with search, sidebar, diagrams.
-    template_engine.hpp     (planned) Lightweight template engine built on Swap.
-
-  lang/
-    verilog/                (planned) Verilog lexer, parser, symbol remapping.
-    sv/                     (planned) SystemVerilog lexer, parser, symbol remapping.
+  target/                   (planned) EDA tool drivers: 9 built-in + custom.
+  lint/                     (planned) Lint engine: 22 rules in 3 categories.
+  doc/                      (planned) Documentation generation: extractors + renderers.
 
 src/util/
   error.cpp                 LoomError::format(), code_name(). Pure string formatting.
   log.cpp                   Global state: s_level, s_color_enabled. va_list printf to stderr.
-  sha256.cpp                FIPS 180-4 implementation. K constants, round functions,
-                            message schedule, padding. ~190 lines.
-  uuid.cpp                  /dev/urandom RNG + mt19937_64 fallback. Hex helpers.
-                            Base36 via divide-by-36 / multiply-by-36 on byte array. ~170 lines.
-  glob.cpp                  Segment-based recursive matching. normalize_path, split_segments,
-                            match_segment (two-pointer with backtracking), match_segments
-                            (handles **). glob_expand via recursive_directory_iterator. ~170 lines.
-  swap.cpp                  Single-pass scanner for {{ var }}. Whitespace-trimmed keys,
-                            \{{ escape, strict (errors) vs lenient (passthrough). ~120 lines.
+  sha256.cpp                FIPS 180-4 implementation. ~190 lines.
+  uuid.cpp                  /dev/urandom RNG + mt19937_64 fallback. Base36 arithmetic. ~170 lines.
+  glob.cpp                  Segment-based recursive matching. ~170 lines.
+  swap.cpp                  Single-pass scanner for {{ var }}. ~120 lines.
+  target_expr.cpp           Recursive descent parser, evaluator, to_string,
+                            is_valid_target_name, parse_target_set, filter_source_groups. ~250 lines.
+  version.cpp               Version/PartialVersion parsing, comparison, constraint matching. ~300 lines.
+  name.cpp                  PkgName validation and normalization. ~50 lines.
+  source.cpp                Dependency::validate() with mutual exclusivity checks. ~80 lines.
+  manifest.cpp              Full Loom.toml parsing via toml++. ~400 lines.
+  config.cpp                Config parsing, merge logic, global_config_path(). ~200 lines.
 
-src/target/                 (planned) ToolDriver implementations + registry.
-src/lint/                   (planned) LintEngine + 22 rule implementations.
-src/doc/                    (planned) DocExtractor, renderers, template engine.
-src/git/                    (planned) GitCli, CacheManager, resolver, lockfile.
+src/lang/
+  lexer.cpp                 ~450-line state machine. Handles identifiers, numbers
+                            (decimal/hex/binary/octal/real/x-z), strings, directives,
+                            escaped identifiers, line/block/doc/suppression comments,
+                            multi-char operators (<=, ==, ===, <<, >>, ->, =>, etc.).
 
 third_party/
-  sqlite3/                  (planned) SQLite amalgamation: sqlite3.h + sqlite3.c (~250 KB).
+  catch2/catch.hpp          Catch2 v2.13.10 single header.
+  tomlplusplus/toml.hpp     toml++ v3.4.0 single header (~17,748 lines).
+  sqlite3/                  (planned) SQLite amalgamation.
 
 tests/
   test_main.cpp             Catch2 CATCH_CONFIG_MAIN. Compiled once, linked to all tests.
-  test_result.cpp           21 cases: ok/err, bool, throws, map, and_then, or_else,
-                            LOOM_TRY propagation, Status, format(), code_name(), move-only.
-  test_log.cpp              7 cases: levels, names, color toggle, threshold filter,
-                            stderr capture via pipe redirect.
-  test_sha256.cpp           10 cases: NIST vectors (empty, "abc", 448-bit, 896-bit),
-                            incremental, hash_file, bytes_to_hex, 10K-byte input.
-  test_uuid.cpp             17 cases: v4 version/variant bits, uniqueness, to_string format,
-                            from_string roundtrip + error rejection, base36 roundtrip
-                            (random, all-zero, all-0xFF), equality operators.
-  test_glob.cpp             18 cases: literal matching, *, ?, **, char classes [a-z]/[!0-9],
-                            negation, glob_filter include+exclude, filesystem expand.
-  test_swap.cpp             16 cases: single/multi/no vars, whitespace, errors (undefined,
-                            unclosed, empty name, hint), \{{ escape, no recursion,
-                            adjacent vars, lenient mode.
+  test_result.cpp           21 cases: ok/err, bool, throws, map, and_then, LOOM_TRY, Status.
+  test_log.cpp              7 cases: levels, names, color, threshold, stderr capture.
+  test_sha256.cpp           10 cases: NIST vectors, incremental, hash_file, bytes_to_hex.
+  test_uuid.cpp             17 cases: v4 bits, uniqueness, string roundtrip, base36 roundtrip.
+  test_glob.cpp             18 cases: literal, *, ?, **, char classes, negation, expand.
+  test_swap.cpp             16 cases: vars, whitespace, errors, escape, lenient mode.
+  test_target_expr.cpp      26 cases: parsing, errors, evaluation, vacuous truth, filtering.
+  test_version.cpp          22 cases: parsing, comparison, pre-release, constraints.
+  test_name.cpp             11 cases: validation, normalization, equality.
+  test_source.cpp           15 cases: GitSource, PathSource, Dependency validation.
+  test_manifest.cpp         18 cases: full Loom.toml parsing, workspace, targets, lint.
+  test_config.cpp           12 cases: parsing, merge, effective config, boolean tracking.
+  test_lexer.cpp            30 cases: all token types, comments, operators, fixtures, edge cases.
+  test_graph.cpp            27 cases: basic ops, topo sort, cycles, DFS, tree display, GraphMap.
+  bench_lexer.cpp           2 benchmarks: 10K lines <100ms (17ms), 50K lines <500ms (71ms).
+  bench_graph.cpp           4 benchmarks: 10K nodes topo/cycle/GraphMap all <50ms (<1ms).
   fixtures/
-    simple_module.v         8-bit counter with clk/rst/en. Used by SHA-256 file hash test.
+    simple_module.v         8-bit counter. Used by SHA-256 file hash test.
+    counter.v               Verilog module with doc comments, suppression, params, always block.
+    package_example.sv      SV fixture: package, interface, modport, always_comb, always_ff.
+    Loom.toml.example       Full realistic manifest fixture for manifest parser tests.
+    workspace.toml.example  Workspace manifest fixture for workspace parsing tests.
 
 demos/
-  demo_errors.cpp           CLI demo: no-args, bad-path, wrong-ext, happy-path.
-                            Chains 4 Result-returning functions with LOOM_TRY.
+  demo_errors.cpp           CLI demo: chains 4 Result-returning functions with LOOM_TRY.
 
 docs/
   research/                 Detailed feature specifications from research agents.
-    loom_doc_specification.md  Documentation generation: DocModel, renderers, templates.
+    loom_doc_specification.md  Documentation generation spec.
 ```
 
 ## Dependency Graph (implemented files)
@@ -151,50 +140,24 @@ docs/
 result.hpp ──depends on──> error.hpp
 log.hpp    ──standalone──
 sha256.hpp ──standalone──  (uses <filesystem> for hash_file)
-uuid.hpp   ──depends on──> result.hpp (returns Result<Uuid> from from_string, decode_base36)
-glob.hpp   ──depends on──> result.hpp (glob_expand returns Result)
-swap.hpp   ──depends on──> result.hpp (swap_template returns Result)
+uuid.hpp   ──depends on──> result.hpp
+glob.hpp   ──depends on──> result.hpp
+swap.hpp   ──depends on──> result.hpp
+target_expr.hpp ──depends on──> result.hpp
+version.hpp ──depends on──> result.hpp
+name.hpp    ──depends on──> result.hpp
+source.hpp  ──depends on──> result.hpp, version.hpp, name.hpp
+manifest.hpp ──depends on──> result.hpp, version.hpp, name.hpp, source.hpp, target_expr.hpp
+config.hpp  ──depends on──> result.hpp
+graph.hpp   ──depends on──> result.hpp
+lang/token.hpp ──standalone──
+lang/verilog_token.hpp ──standalone──
+lang/lexer.hpp ──depends on──> token.hpp, verilog_token.hpp, result.hpp
 
 All src/*.cpp include their corresponding header.
 All tests link against loom_core (static lib) + catch2_main (object lib).
-```
-
-## Planned Dependency Graph (full project)
-
-```
-Foundation:
-  result.hpp ──> error.hpp
-  uuid.hpp ──> result.hpp
-  target_expr.hpp ──> result.hpp
-  source_group.hpp ──> target_expr.hpp
-
-Manifest/Config:
-  manifest.hpp ──> version.hpp, name.hpp, source_group.hpp, result.hpp
-  config.hpp ──> result.hpp
-
-Git/Dependencies:
-  git.hpp ──> result.hpp
-  cache_git.hpp ──> git.hpp, sha256.hpp
-  lockfile.hpp ──> result.hpp
-  resolver.hpp ──> git.hpp, lockfile.hpp, manifest.hpp, workspace.hpp
-
-Build Cache:
-  cache.hpp ──> result.hpp, sha256.hpp (+ third_party/sqlite3)
-
-Workspace/Project:
-  workspace.hpp ──> manifest.hpp, glob.hpp, result.hpp
-  local_override.hpp ──> result.hpp
-  project.hpp ──> manifest.hpp, workspace.hpp
-
-Filelist/Targets:
-  filelist.hpp ──> source_group.hpp, cache.hpp
-  target/tool_driver.hpp ──> filelist.hpp, result.hpp
-  target/driver_custom.hpp ──> tool_driver.hpp, swap.hpp
-
-Lint/Doc:
-  lint/lint_engine.hpp ──> lint_rule.hpp, lint_config.hpp, lint_suppression.hpp
-  doc/doc_extractor.hpp ──> doc_comment.hpp, doc_model.hpp
-  doc/template_engine.hpp ──> swap.hpp
+manifest.cpp uses third_party/tomlplusplus/toml.hpp.
+config.cpp uses third_party/tomlplusplus/toml.hpp.
 ```
 
 ## Key Patterns
@@ -220,16 +183,19 @@ static std::string fixture_path(const std::string& name) {
 an optional `TargetExpr`. At build time, groups are filtered against the active target
 set (from `--target` CLI flag). Only matching groups' files enter the filelist pipeline.
 
-**Git dependencies**: All dependency sources are explicit (git URL or local path).
-No central registry. Loom shells out to the `git` CLI for all operations, inheriting
-the user's SSH keys, credential helpers, and `.gitconfig`.
+**TOML parsing**: Uses toml++ v3.4.0 single header. Manifest and Config both parse
+TOML tables. Use `R"TOML(...)TOML"` delimiter for raw string literals containing
+parentheses in test fixtures.
 
-**Incremental cache**: SQLite-based content-addressed cache. Stat metadata (inode +
-mtime + size) provides a fast path to skip SHA-256 hashing of unchanged files.
-Parse results and filelists are cached by content hash.
+**Header-only templates**: `Graph<NodeData, EdgeData>` is header-only to avoid
+explicit template instantiation. ~285 lines including GraphMap wrapper.
 
-**Loom.local overrides**: Developer-local overrides that bypass the lockfile without
-modifying it. Loom.local is gitignored by default and emits a warning when active.
+**Lexer state machine**: Character-level lexer with `is_sv` flag gating SV keyword
+recognition. Preserves `///` doc comments and `// loom: ignore[...]` suppression
+comments for downstream phases (lint, doc generation).
+
+**Config merge**: Layered config (global > workspace > local) with explicit `_set`
+tracking flags for boolean fields to distinguish "not mentioned" from "set to false".
 
 ## Build
 
@@ -243,4 +209,11 @@ Sanitizer run:
 ```bash
 cmake .. -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
 cmake --build . --clean-first && ctest --output-on-failure
+```
+
+Performance benchmarks (Release mode):
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build .
+./bench_lexer -s    # lexer: 10K lines, 50K lines
+./bench_graph -s    # graph: topo sort, cycle detection, GraphMap
 ```

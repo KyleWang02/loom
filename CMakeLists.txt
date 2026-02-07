@@ -76,3 +76,10 @@ loom_add_test(test_config tests/test_config.cpp)
 
 # Phase 4 tests
 loom_add_test(test_lexer tests/test_lexer.cpp)
+
+# Phase 6 tests
+loom_add_test(test_graph tests/test_graph.cpp)
+
+# Performance benchmarks
+loom_add_test(bench_lexer tests/bench_lexer.cpp)
+loom_add_test(bench_graph tests/bench_graph.cpp)

@@ -19,9 +19,9 @@ See `CLAUDE.md` "Checkpoint Workflow" section for full details.
 - [x] Phase 2: Target Expression Parser ← DONE
 - [x] Phase 3: Manifest, Configuration, and Versioning ← DONE
 - [x] Phase 4: Verilog/SystemVerilog Lexer and Tokenizer ← DONE
-- [ ] Phase 5: Verilog/SystemVerilog Parser and Design Unit Extraction
-- [ ] Phase 6: Graph Data Structures and Algorithms
-- [ ] Phase 7: Git Dependencies and Cache Manager
+- [ ] Phase 5: Verilog/SystemVerilog Parser and Design Unit Extraction ← NEXT UP
+- [x] Phase 6: Graph Data Structures and Algorithms ← DONE
+- [ ] Phase 7: Git Dependencies and Cache Manager ← NEXT UP
 - [ ] Phase 8: Incremental Build Cache (SQLite)
 - [ ] Phase 9: Workspace, Project Model, and Local Overrides
 - [ ] Phase 10: Dependency Resolution and Lockfile
@@ -220,7 +220,7 @@ Files: `token.hpp`, `lexer.hpp`, `verilog_token.hpp`, `verilog_keywords.hpp`, `s
 - [x] Preserve `// loom: ignore[...]` suppression comments (for Phase 13 lint)
 - [x] Write test fixtures (`simple_module.v`, `counter.v`, `package_example.sv`)
 - [x] Write tests for both lexers (30 test cases)
-- [ ] Verify performance: < 100ms for 10K-line file
+- [x] Verify performance: < 100ms for 10K-line file (17ms actual)
 
 ### Phase 5: Verilog/SystemVerilog Parser and Design Unit Extraction
 
@@ -268,17 +268,17 @@ struct ModuleAST {
 
 Files: `graph.hpp` (header-only template) + tests
 
-- [ ] Implement `Graph<NodeData, EdgeData>` with adjacency list
-- [ ] Implement `add_node`, `add_edge`, `has_edge`
-- [ ] Implement `successors`, `predecessors`, `in_degree`, `out_degree`
-- [ ] Implement topological sort (Kahn's algorithm)
-- [ ] Implement minimal topological sort (from root)
-- [ ] Implement cycle detection
-- [ ] Implement DFS traversal
-- [ ] Implement tree display formatting
-- [ ] Implement `GraphMap` (string-keyed convenience wrapper)
-- [ ] Write tests (linear, diamond, cycle, large graph)
-- [ ] Verify performance: < 50ms for 10K nodes
+- [x] Implement `Graph<NodeData, EdgeData>` with adjacency list
+- [x] Implement `add_node`, `add_edge`, `has_edge`
+- [x] Implement `successors`, `predecessors`, `in_degree`, `out_degree`
+- [x] Implement topological sort (Kahn's algorithm)
+- [x] Implement minimal topological sort (from root)
+- [x] Implement cycle detection
+- [x] Implement DFS traversal
+- [x] Implement tree display formatting
+- [x] Implement `GraphMap` (string-keyed convenience wrapper)
+- [x] Write tests (linear, diamond, cycle, disconnected, edge data, GraphMap)
+- [x] Verify performance: < 50ms for 10K nodes (0-1ms actual)
 
 ### Phase 7: Git Dependencies and Cache Manager
 
