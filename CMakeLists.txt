@@ -26,6 +26,7 @@ add_library(loom_core
     src/util/manifest.cpp
     src/util/config.cpp
     src/lang/lexer.cpp
+    src/lang/parser.cpp
 )
 target_include_directories(loom_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -79,6 +80,9 @@ loom_add_test(test_lexer tests/test_lexer.cpp)
 
 # Phase 6 tests
 loom_add_test(test_graph tests/test_graph.cpp)
+
+# Phase 5 tests
+loom_add_test(test_parser tests/test_parser.cpp)
 
 # Performance benchmarks
 loom_add_test(bench_lexer tests/bench_lexer.cpp)
