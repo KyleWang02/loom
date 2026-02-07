@@ -1,0 +1,51 @@
+[package]
+name = "my-soc"
+version = "1.0.0"
+top = "soc_top"
+authors = ["Alice", "Bob"]
+
+[dependencies]
+uart_ip    = { git = "https://github.com/org/uart.git", tag = "v1.3.0" }
+axi_bus    = { git = "https://github.com/org/axi.git", version = ">=2.0.0, <3.0.0" }
+spi_dev    = { git = "https://github.com/org/spi.git", branch = "develop" }
+my_testbench = { path = "../testbench" }
+
+[[sources]]
+files = ["rtl/soc_top.sv", "rtl/bus_arbiter.sv"]
+include_dirs = ["rtl/include"]
+defines = ["SYNTHESIS"]
+
+[[sources]]
+target = "simulation"
+files = ["tb/tb_soc.sv"]
+defines = ["SIM_MODE"]
+
+[[sources]]
+target = "all(simulation, not(verilator))"
+files = ["tb/tb_sram_model.sv"]
+
+[targets.sim]
+tool = "verilator"
+action = "simulate"
+
+[targets.sim.options]
+compile_args = ["--timing", "-Wall"]
+waveform = true
+
+[targets.synth]
+tool = "vivado-synth"
+action = "synthesize"
+
+[targets.synth.options]
+device = "xc7a35ticsg324-1L"
+
+[lint]
+blocking-in-ff = "error"
+naming-module = "warn"
+
+[lint.naming]
+module_pattern = "[a-z][a-z0-9_]*"
+
+[build]
+pre-lint = true
+lint-fatal = false

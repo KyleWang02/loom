@@ -19,6 +19,13 @@ add_library(loom_core
     src/util/uuid.cpp
     src/util/glob.cpp
     src/util/swap.cpp
+    src/util/target_expr.cpp
+    src/util/version.cpp
+    src/util/name.cpp
+    src/util/source.cpp
+    src/util/manifest.cpp
+    src/util/config.cpp
+    src/lang/lexer.cpp
 )
 target_include_directories(loom_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -56,3 +63,16 @@ loom_add_test(test_sha256 tests/test_sha256.cpp)
 loom_add_test(test_uuid tests/test_uuid.cpp)
 loom_add_test(test_glob tests/test_glob.cpp)
 loom_add_test(test_swap tests/test_swap.cpp)
+
+# Phase 2 tests
+loom_add_test(test_target_expr tests/test_target_expr.cpp)
+
+# Phase 3 tests
+loom_add_test(test_version tests/test_version.cpp)
+loom_add_test(test_name tests/test_name.cpp)
+loom_add_test(test_source tests/test_source.cpp)
+loom_add_test(test_manifest tests/test_manifest.cpp)
+loom_add_test(test_config tests/test_config.cpp)
+
+# Phase 4 tests
+loom_add_test(test_lexer tests/test_lexer.cpp)

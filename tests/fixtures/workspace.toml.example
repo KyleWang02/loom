@@ -1,0 +1,7 @@
+[workspace]
+members = ["ip/*", "soc/top"]
+exclude = ["ip/deprecated_uart"]
+default-members = ["soc/top"]
+
+[workspace.dependencies]
+common_cells = { git = "https://github.com/org/common.git", tag = "v1.37.0" }

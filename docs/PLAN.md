@@ -16,9 +16,9 @@ See `CLAUDE.md` "Checkpoint Workflow" section for full details.
 
 - [x] Phase 0: Project Scaffolding and Session Management ← DONE
 - [x] Phase 1: Foundation Layer (Result, SHA256, UUID, Glob, Swap, Log) ← DONE
-- [ ] Phase 2: Target Expression Parser
-- [ ] Phase 3: Manifest, Configuration, and Versioning
-- [ ] Phase 4: Verilog/SystemVerilog Lexer and Tokenizer
+- [x] Phase 2: Target Expression Parser ← DONE
+- [x] Phase 3: Manifest, Configuration, and Versioning ← DONE
+- [x] Phase 4: Verilog/SystemVerilog Lexer and Tokenizer ← DONE
 - [ ] Phase 5: Verilog/SystemVerilog Parser and Design Unit Extraction
 - [ ] Phase 6: Graph Data Structures and Algorithms
 - [ ] Phase 7: Git Dependencies and Cache Manager
@@ -129,18 +129,18 @@ Files: `target_expr.hpp`, `source_group.hpp`, `target_expr.cpp` + tests
 
 Implements boolean filter expressions for conditional source file inclusion, adopted from Bender's proven grammar: `all()`, `any()`, `not()`, bare identifiers, and `*` wildcard.
 
-- [ ] Define `TargetExpr` class with `Kind` enum (`Wildcard`, `Identifier`, `All`, `Any`, `Not`)
-- [ ] Implement static constructors: `wildcard()`, `identifier()`, `all()`, `any()`, `negation()`
-- [ ] Implement `TargetExpr::parse()` — recursive descent parser for expression strings
-- [ ] Implement `TargetExpr::evaluate(const TargetSet& active)` — evaluate against active target set
-- [ ] Implement `TargetExpr::to_string()` — canonical serialization
-- [ ] Define `TargetSet = std::unordered_set<std::string>`
-- [ ] Implement `parse_target_set()` — parse comma-separated CLI target string
-- [ ] Implement `is_valid_target_name()` — validation regex `[a-zA-Z][a-zA-Z0-9_-]*`
-- [ ] Define `SourceGroup` struct with `optional<TargetExpr> target`, `include_dirs`, `defines`, `files`
-- [ ] Implement `filter_source_groups()` — filter groups by active target set
-- [ ] Write tests: parsing (bare, wildcard, nested, whitespace, errors), evaluation (all combinations, empty set, vacuous truth), roundtrip serialization, target name validation, CLI set parsing, source group filtering
-- [ ] Verify `all()` with no children = true (vacuous truth), `any()` with no children = false
+- [x] Define `TargetExpr` class with `Kind` enum (`Wildcard`, `Identifier`, `All`, `Any`, `Not`)
+- [x] Implement static constructors: `wildcard()`, `identifier()`, `all()`, `any()`, `negation()`
+- [x] Implement `TargetExpr::parse()` — recursive descent parser for expression strings
+- [x] Implement `TargetExpr::evaluate(const TargetSet& active)` — evaluate against active target set
+- [x] Implement `TargetExpr::to_string()` — canonical serialization
+- [x] Define `TargetSet = std::unordered_set<std::string>`
+- [x] Implement `parse_target_set()` — parse comma-separated CLI target string
+- [x] Implement `is_valid_target_name()` — validation regex `[a-zA-Z][a-zA-Z0-9_-]*`
+- [x] Define `SourceGroup` struct with `optional<TargetExpr> target`, `include_dirs`, `defines`, `files`
+- [x] Implement `filter_source_groups()` — filter groups by active target set
+- [x] Write tests: parsing (bare, wildcard, nested, whitespace, errors), evaluation (all combinations, empty set, vacuous truth), roundtrip serialization, target name validation, CLI set parsing, source group filtering
+- [x] Verify `all()` with no children = true (vacuous truth), `any()` with no children = false
 
 **Grammar**:
 ```
@@ -166,18 +166,18 @@ Files: `version.hpp`, `name.hpp`, `manifest.hpp`, `config.hpp`, `source.hpp` + i
 
 Expanded from original to support git/path dependency sources, `[[sources]]` with target filter expressions, `[lint]` configuration, and `[workspace]` sections. Uses toml++ for parsing.
 
-- [ ] Implement `Version` (major.minor.micro + optional label) with parsing and comparison
-- [ ] Implement `PartialVersion` with compatibility checking
-- [ ] Implement semver constraint parsing (`^`, `~`, `>=`, `<`, ranges)
-- [ ] Implement `PkgName` with validation and normalization
-- [ ] Define `DependencySource` variant: `GitSource` (url + tag/version/rev/branch) | `PathSource`
-- [ ] Implement `Dependency` struct with source validation rules:
+- [x] Implement `Version` (major.minor.micro + optional label) with parsing and comparison
+- [x] Implement `PartialVersion` with compatibility checking
+- [x] Implement semver constraint parsing (`^`, `~`, `>=`, `<`, ranges)
+- [x] Implement `PkgName` with validation and normalization
+- [x] Define `DependencySource` variant: `GitSource` (url + tag/version/rev/branch) | `PathSource`
+- [x] Implement `Dependency` struct with source validation rules:
   - Exactly one of `{tag, version, rev, branch}` when `git` is present
   - `git` and `path` are mutually exclusive
   - `version` without `git` is an error (no registry)
   - `{ workspace = true }` for workspace dependency inheritance
   - `{ member = true }` for inter-workspace-member references
-- [ ] Implement `Manifest` (Loom.toml) parsing with toml++:
+- [x] Implement `Manifest` (Loom.toml) parsing with toml++:
   - `[package]` section: name, version, top, authors
   - `[dependencies]` section: git/path/workspace/member sources
   - `[[sources]]` array-of-tables: `SourceGroup` with optional `target` filter expression
@@ -185,10 +185,10 @@ Expanded from original to support git/path dependency sources, `[[sources]]` wit
   - `[workspace]` section: members, exclude, default-members, `[workspace.dependencies]`
   - `[targets.<name>]` sections: tool, action, options, custom commands
   - `[build]` section: pre-lint, lint-fatal options
-- [ ] Implement `Config` with layered loading (global > workspace > local)
-- [ ] Implement config merge rules (member overrides workspace)
-- [ ] Write test fixtures (`Loom.toml.example`, `config.toml.example`)
-- [ ] Write tests for all components
+- [x] Implement `Config` with layered loading (global > workspace > local)
+- [x] Implement config merge rules (member overrides workspace)
+- [x] Write test fixtures (`Loom.toml.example`, `config.toml.example`)
+- [x] Write tests for all components
 - [ ] Verify manifest roundtrip (load -> save -> load)
 
 **Dependency specification examples**:
@@ -207,19 +207,19 @@ sibling_ip   = { member = true }
 
 Files: `token.hpp`, `lexer.hpp`, `verilog_token.hpp`, `verilog_keywords.hpp`, `sv_token.hpp`, `sv_keywords.hpp` + implementations + tests
 
-- [ ] Implement `Token<T>` template with position tracking (file, line, col)
-- [ ] Implement character-level `Lexer` state machine
-- [ ] Define `VerilogTokenType` enum (~40 token types)
-- [ ] Implement Verilog keyword lookup table (~100 keywords)
-- [ ] Implement Verilog tokenizer (identifiers, numbers, strings, comments, directives, operators)
-- [ ] Handle escaped identifiers
-- [ ] Define `SvTokenType` (extends Verilog)
-- [ ] Implement SV keyword table (adds ~130 keywords)
-- [ ] Implement SV tokenizer
-- [ ] Preserve `///` doc comments in token stream (for Phase 14 documentation extraction)
-- [ ] Preserve `// loom: ignore[...]` suppression comments (for Phase 13 lint)
-- [ ] Write test fixtures (`simple_module.v`, `counter.v`, `package_example.sv`)
-- [ ] Write tests for both lexers
+- [x] Implement `Token<T>` template with position tracking (file, line, col)
+- [x] Implement character-level `Lexer` state machine
+- [x] Define `VerilogTokenType` enum (~40 token types + SV extensions in single enum)
+- [x] Implement Verilog keyword lookup table (~90 keywords including SV)
+- [x] Implement Verilog tokenizer (identifiers, numbers, strings, comments, directives, operators)
+- [x] Handle escaped identifiers
+- [x] SV keywords in single enum, gated by `is_sv` flag in lexer
+- [x] Implement SV keyword recognition (logic, interface, always_comb, etc.)
+- [x] Implement SV tokenizer (same lexer with is_sv=true)
+- [x] Preserve `///` doc comments in token stream (for Phase 14 documentation extraction)
+- [x] Preserve `// loom: ignore[...]` suppression comments (for Phase 13 lint)
+- [x] Write test fixtures (`simple_module.v`, `counter.v`, `package_example.sv`)
+- [x] Write tests for both lexers (30 test cases)
 - [ ] Verify performance: < 100ms for 10K-line file
 
 ### Phase 5: Verilog/SystemVerilog Parser and Design Unit Extraction
