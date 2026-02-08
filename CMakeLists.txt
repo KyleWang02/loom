@@ -46,6 +46,7 @@ add_library(loom_core
     src/util/resolver.cpp
     src/util/filelist.cpp
     src/util/tool_driver.cpp
+    src/util/lint.cpp
 )
 target_include_directories(loom_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -127,6 +128,9 @@ loom_add_test(test_filelist tests/test_filelist.cpp)
 
 # Phase 12 tests
 loom_add_test(test_tool_driver tests/test_tool_driver.cpp)
+
+# Phase 13 tests
+loom_add_test(test_lint tests/test_lint.cpp)
 
 # Performance benchmarks
 loom_add_test(bench_lexer tests/bench_lexer.cpp)
