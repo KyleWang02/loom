@@ -47,6 +47,7 @@ add_library(loom_core
     src/util/filelist.cpp
     src/util/tool_driver.cpp
     src/util/lint.cpp
+    src/util/doc.cpp
 )
 target_include_directories(loom_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -64,6 +65,15 @@ target_link_libraries(demo_errors loom_core)
 
 add_executable(loom-dump demos/demo_dump.cpp)
 target_link_libraries(loom-dump loom_core)
+
+add_executable(demo_lint demos/demo_lint.cpp)
+target_link_libraries(demo_lint loom_core)
+
+add_executable(demo_resolver demos/demo_resolver.cpp)
+target_link_libraries(demo_resolver loom_core)
+
+add_executable(demo_filelist demos/demo_filelist.cpp)
+target_link_libraries(demo_filelist loom_core)
 
 # Testing
 enable_testing()
@@ -131,6 +141,9 @@ loom_add_test(test_tool_driver tests/test_tool_driver.cpp)
 
 # Phase 13 tests
 loom_add_test(test_lint tests/test_lint.cpp)
+
+# Phase 14 tests
+loom_add_test(test_doc tests/test_doc.cpp)
 
 # Performance benchmarks
 loom_add_test(bench_lexer tests/bench_lexer.cpp)
