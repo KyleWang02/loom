@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-02-07 (Session 9)
+
+**Focus**: Phase 10 — Dependency Resolution
+
+**Completed**:
+- **Phase 10 — Dependency Resolution**: Full `DependencyResolver` implementation:
+  - `resolver.hpp` — 91 lines: `DependencyResolver` class, `ResolveOptions`, `ResolvedPackage` structs
+  - `resolver.cpp` — 396 lines: BFS resolution, conflict detection, lockfile building
+  - resolve(), update(), resolve_workspace(), resolve_deps(), resolve_git(), resolve_path()
+  - load_transitive_deps(), apply_overrides(), topological_sort(), build_lockfile()
+  - 26 test cases (193 assertions), all passing, ASan/UBSan clean
+- All 25 test executables pass (468+ total assertions)
+
+**Key Decisions**:
+- `CacheManager&` (not `GitCli*`): CacheManager already owns GitCli internally
+- No virtual mocking: tests use local git repos in temp dirs
+- BFS first-to-resolve wins: closest-to-root takes precedence (matches Cargo/npm)
+
+**Checkpoint Status**: Phases 0-10 complete. All tests pass under ASan/UBSan.
+
+**Next**:
+1. Phase 11: Filelist Generation with Target Filtering
+2. Phase 12: EDA Tool Drivers
+3. Phase 13: Lint Engine
+4. Phase 14: Documentation Generation
+5. Phase 15: CLI Interface and Commands
+
+**Files Changed**:
+- `include/loom/resolver.hpp` (new — DependencyResolver class, 91 lines)
+- `src/util/resolver.cpp` (new — full implementation, 396 lines)
+- `tests/test_resolver.cpp` (new — 26 test cases, 898 lines)
+- `CMakeLists.txt` (modified — added resolver.cpp to loom_core, added test_resolver target)
+
+---
+
 ## 2026-02-07 (Session 8)
 
 **Focus**: Phase 8 — Incremental Build Cache (SQLite)

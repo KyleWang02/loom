@@ -25,9 +25,9 @@ See `CLAUDE.md` "Checkpoint Workflow" section for full details.
 - [x] Phase 8: Incremental Build Cache (SQLite) ← DONE
 - [x] Phase 9: Workspace, Project Model, and Local Overrides ← DONE
 - [x] Phase 10: Dependency Resolution and Lockfile ← DONE
-- [ ] Phase 11: Filelist Generation (with Target Filtering) ← NEXT UP
-- [ ] Phase 12: EDA Tool Drivers
-- [ ] Phase 13: Lint Engine
+- [x] Phase 11: Filelist Generation (with Target Filtering) ← DONE
+- [x] Phase 12: EDA Tool Drivers ← DONE
+- [ ] Phase 13: Lint Engine ← NEXT UP
 - [ ] Phase 14: Documentation Generation
 - [ ] Phase 15: CLI Interface and Commands
 - [ ] Phase 16: Integration, Symbol Remapping, and Polish
@@ -454,22 +454,22 @@ Files: `filelist.hpp` + implementation + tests
 
 Generates topologically-sorted file lists for EDA tools, now incorporating target expression filtering from Phase 2.
 
-- [ ] Build unit-level graph from parsed design units
-- [ ] Map units to files (file-level graph)
-- [ ] Integrate target filtering into filelist pipeline:
+- [x] Build unit-level graph from parsed design units
+- [x] Map units to files (file-level graph)
+- [x] Integrate target filtering into filelist pipeline:
   1. Parse `Loom.toml` → list of `SourceGroup` (each with optional `TargetExpr`)
   2. Resolve dependencies → full dep tree with all source groups
   3. Evaluate each `SourceGroup` against active target set → include or skip
   4. Parse included files → extract design units
   5. Build dependency graph → topological sort
   6. Emit filelist (ordered file list)
-- [ ] Implement topological sort of file graph
-- [ ] Implement output formats: standard file list (`.f`), JSON
-- [ ] Implement top-level module detection
-- [ ] Implement testbench heuristic
-- [ ] Handle black box modules (warnings)
-- [ ] Integrate with incremental build cache (Phase 8) — skip unchanged files
-- [ ] Write tests
+- [x] Implement topological sort of file graph
+- [x] Implement output formats: standard file list (`.f`), JSON
+- [x] Implement top-level module detection
+- [x] Implement testbench heuristic
+- [x] Handle black box modules (warnings)
+- [x] Integrate with incremental build cache (Phase 8) — skip unchanged files
+- [x] Write tests
 
 ### Phase 12: EDA Tool Drivers
 
@@ -477,34 +477,31 @@ Files: `include/loom/target/types.hpp`, `tool_driver.hpp`, `driver_*.hpp` + impl
 
 Built-in drivers for 9 EDA tools plus a custom driver for arbitrary tools. Three-phase lifecycle: `configure()` → `build()` → `run()`.
 
-- [ ] Define core data structures in `types.hpp`:
-  - `SourceFile` — path, language (Verilog/SV), is_include_file, library
-  - `Filelist` — name, top_module, files, include_dirs, defines, parameters, plusargs
+- [x] Define core data structures in `tool_types.hpp`:
   - `ToolAction` enum — Lint, Simulate, Synthesize, Build
-  - `ToolResult` — exit_code, stdout/stderr logs, work_dir, waveform/artifact paths
+  - `ToolResult` — exit_code, stdout/stderr logs, work_dir, artifact paths
   - `ToolOptions` — compile/elaborate/simulate/synth args, timescale, waveform config, device/family
-- [ ] Implement `ToolDriver` abstract base class:
+  - `ToolCommand` — args, working_dir, description
+- [x] Implement `ToolDriver` abstract base class:
   - Identity: `name()`, `display_name()`, `supported_actions()`, `supports()`
   - Discovery: `find_executable()`, `detect_version()`
-  - Lifecycle: `configure()`, `build()`, `run()`, `execute()` (one-shot)
-  - Helpers: `write_standard_filelist()`, `write_tcl_script()`, `run_command()`
-- [ ] Implement `create_driver()` factory and `available_drivers()` registry
-- [ ] Implement per-tool drivers:
-  - `IcarusDriver` — iverilog/vvp, `.scr` command file, lint+simulate
-  - `VerilatorDriver` — verilator, `.vc` file, lint+simulate, `--trace-fst`
-  - `VivadoSimDriver` — xvlog/xelab/xsim, TCL batch, simulate
-  - `VivadoSynthDriver` — vivado batch, `build.tcl`, synthesize+build
-  - `QuartusDriver` — quartus_sh, TCL setup, synthesize+build
-  - `ModelSimDriver` — vsim/vlog, TCL + DO files, simulate
-  - `VcsDriver` — vcs/simv, `.f` file list, simulate
-  - `XceliumDriver` — xrun (single invocation), `.f` file list, simulate
-  - `YosysDriver` — yosys, `.ys` script, synthesize
-  - `CustomDriver` — user-defined commands in Loom.toml with `{{ variable }}` substitution via Swap engine
-- [ ] Implement target resolution rules:
-  1. Explicit: `--target synth-vivado`
-  2. Default by action: `loom build` → first synthesis target, `loom test` → first simulation target
-  3. Auto-detection: probe PATH in priority order (verilator > icarus > xsim > modelsim > vcs > xcelium)
-- [ ] Write tests (driver registry, file list generation, TCL generation, tool discovery mocking)
+  - Command generation: `generate_commands()` (pure, testable)
+  - Execution: `execute()` (runs real commands via `run_command`)
+  - Helpers: `write_filelist()`, `write_tcl_script()`, `resolve_top_module()`
+- [x] Implement `create_driver()` factory and `available_drivers()` registry
+- [x] Implement per-tool drivers:
+  - `IcarusDriver` — iverilog/vvp, filelist.f, lint+simulate
+  - `VerilatorDriver` — verilator, filelist.f, lint+simulate, `--trace-fst`
+  - `VivadoSimDriver` — xvlog/xelab/xsim, 3-step pipeline, simulate
+  - `VivadoSynthDriver` — vivado batch, build.tcl, synthesize+build
+  - `QuartusDriver` — quartus_sh, project.tcl, synthesize+build
+  - `ModelSimDriver` — vsim/vlog, run.do, simulate
+  - `VcsDriver` — vcs/simv, filelist.f, simulate
+  - `XceliumDriver` — xrun (single invocation), filelist.f, simulate
+  - `YosysDriver` — yosys, synth.ys, synthesize
+  - `CustomDriver` — user-defined commands with `{{ variable }}` substitution via Swap engine
+- [x] Implement auto-detection: `detect_driver()` probes PATH in priority order
+- [x] Write tests (39 cases, 190 assertions — driver registry, command generation, TCL scripts, swap substitution)
 
 **Loom.toml target configuration**:
 ```toml

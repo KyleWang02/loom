@@ -85,9 +85,20 @@ include/loom/
                             resolve(), update(), resolve_workspace(), apply_overrides(),
                             topological_sort(). ResolveOptions, ResolvedPackage structs.
 
-  filelist.hpp              (planned) Filelist generation with target filtering.
+  filelist.hpp              FilelistGenerator class. Pipeline: parse_all_files →
+                            build_unit_graph → build_file_graph → topo_sort → detect.
+                            FilelistResult with providers-first file list, to_dot_f(),
+                            to_json(). Top module detection, black box detection,
+                            testbench heuristics. Optional BuildCache* for caching.
 
-  target/                   (planned) EDA tool drivers: 9 built-in + custom.
+  tool_types.hpp            ToolAction enum (Lint/Simulate/Synthesize/Build),
+                            ToolResult, ToolOptions (from_map with CSV parsing),
+                            ToolCommand structs.
+  tool_driver.hpp           ToolDriver abstract base class. Command generation (pure)
+                            vs execution (subprocess). 10 drivers: Icarus, Verilator,
+                            VivadoSim, VivadoSynth, Quartus, ModelSim, VCS, Xcelium,
+                            Yosys, Custom. Factory: create_driver(), detect_driver().
+
   lint/                     (planned) Lint engine: 22 rules in 3 categories.
   doc/                      (planned) Documentation generation: extractors + renderers.
 
@@ -109,6 +120,8 @@ src/util/
   local_override.cpp        Loom.local TOML parser, validation, discovery. ~185 lines.
   project.cpp               Project detection, loading, checksum. ~140 lines.
   resolver.cpp              BFS dependency resolution, git/path resolution, lockfile building. ~396 lines.
+  filelist.cpp              Filelist generation pipeline. ~450 lines.
+  tool_driver.cpp           10 EDA tool drivers + factory + options parsing. ~500 lines.
 
 src/lang/
   lexer.cpp                 ~450-line state machine. Handles identifiers, numbers
@@ -155,6 +168,10 @@ tests/
   test_resolver.cpp         26 cases: single dep (tag/version/rev/branch/path), transitive
                             (two-level, diamond, deep chain, mixed), lockfile reuse/stale,
                             selective update, conflict detection, overrides, topo sort, edge cases.
+  test_filelist.cpp         30 cases: graph construction, topo sort, top modules, black boxes,
+                            testbenches, output formats, target filtering, caching.
+  test_tool_driver.cpp      39 cases: action parsing, options parsing, factory, driver identity,
+                            command generation for all 10 drivers, helpers, resolve_top_module.
   bench_lexer.cpp           2 benchmarks: 10K lines <100ms (17ms), 50K lines <500ms (71ms).
   bench_graph.cpp           4 benchmarks: 10K nodes topo/cycle/GraphMap all <50ms (<1ms).
   bench_parser.cpp          Parser performance benchmark.
@@ -201,6 +218,9 @@ workspace.hpp ──depends on──> result.hpp, manifest.hpp, config.hpp
 local_override.hpp ──depends on──> result.hpp
 resolver.hpp ──depends on──> result.hpp, cache.hpp, manifest.hpp, lockfile.hpp, workspace.hpp, local_override.hpp, graph.hpp
 build_cache.hpp ──depends on──> result.hpp, ir.hpp (pImpl hides sqlite3.h)
+filelist.hpp ──depends on──> result.hpp, target_expr.hpp, ir.hpp, build_cache.hpp, graph.hpp
+tool_types.hpp ──depends on──> result.hpp
+tool_driver.hpp ──depends on──> tool_types.hpp, filelist.hpp, manifest.hpp, swap.hpp
 
 All src/*.cpp include their corresponding header.
 All tests link against loom_core (static lib) + catch2_main (object lib).
@@ -211,6 +231,7 @@ lockfile.cpp uses third_party/tomlplusplus/toml.hpp.
 local_override.cpp uses third_party/tomlplusplus/toml.hpp.
 build_cache.cpp uses third_party/sqlite3/sqlite3.h (internal only, not in public header).
 resolver.cpp uses cache.hpp, git.hpp, manifest.hpp, lockfile.hpp, workspace.hpp, local_override.hpp, graph.hpp.
+tool_driver.cpp uses git.hpp (for run_command), swap.hpp, filelist.hpp, manifest.hpp.
 ```
 
 ## Key Patterns

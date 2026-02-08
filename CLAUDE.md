@@ -41,10 +41,10 @@ Run the `/handoff` command at end of session. It:
 ## Current State
 
 - **Date**: 2026-02-07
-- **Phase**: Phases 0-10 COMPLETE. Next: Phase 11 (Filelist Generation).
+- **Phase**: Phases 0-12 COMPLETE. Next: Phase 13 (Lint Engine).
 - **Branch**: main
 - **Blockers**: None
-- **Tests**: 468+ assertions across 25 test executables (22 suites + 3 benchmarks). ASan/UBSan clean.
+- **Tests**: 754+ assertions across 28 test executables (24 suites + 4 benchmarks).
 - **Performance**: Lexer 17ms/10K lines, Graph <1ms/10K nodes
 - **Dependencies**: SQLite 3.45.0 amalgamation in `third_party/sqlite3/`
 - **Terminology**: "Filelist" (not Blueprint), "Symbol Remapping/SR" (not DST)

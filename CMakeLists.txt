@@ -44,6 +44,8 @@ add_library(loom_core
     src/util/workspace.cpp
     src/util/local_override.cpp
     src/util/resolver.cpp
+    src/util/filelist.cpp
+    src/util/tool_driver.cpp
 )
 target_include_directories(loom_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -119,6 +121,12 @@ loom_add_test(test_local_override tests/test_local_override.cpp)
 
 # Phase 10 tests
 loom_add_test(test_resolver tests/test_resolver.cpp)
+
+# Phase 11 tests
+loom_add_test(test_filelist tests/test_filelist.cpp)
+
+# Phase 12 tests
+loom_add_test(test_tool_driver tests/test_tool_driver.cpp)
 
 # Performance benchmarks
 loom_add_test(bench_lexer tests/bench_lexer.cpp)
