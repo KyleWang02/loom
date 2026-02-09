@@ -75,6 +75,9 @@ target_link_libraries(demo_resolver loom_core)
 add_executable(demo_filelist demos/demo_filelist.cpp)
 target_link_libraries(demo_filelist loom_core)
 
+add_executable(loom-demo demos/loom_demo.cpp)
+target_link_libraries(loom-demo loom_core)
+
 # Testing
 enable_testing()
 

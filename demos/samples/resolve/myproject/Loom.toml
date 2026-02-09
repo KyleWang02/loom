@@ -1,0 +1,8 @@
+[package]
+name = "myproject"
+version = "0.1.0"
+description = "Demo SoC project"
+
+[dependencies]
+uart_ip = { path = "/home/kylewang02/loom/demos/samples/resolve/deps/uart_ip", version = ">=1.0.0" }
+spi_ip  = { path = "/home/kylewang02/loom/demos/samples/resolve/deps/spi_ip",  version = ">=0.2.0" }
