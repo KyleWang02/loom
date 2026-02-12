@@ -3,10 +3,15 @@
 #include <string>
 #include <filesystem>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 namespace loom {
 
-/// RAII file lock using flock(). Acquires exclusive lock on construction,
+/// RAII file lock. Acquires exclusive lock on construction,
 /// releases on destruction. Used for concurrent build safety.
+/// Uses flock() on POSIX, LockFileEx() on Windows.
 class FileLock {
 public:
     explicit FileLock(const std::filesystem::path& lock_path);
@@ -17,7 +22,11 @@ public:
     bool is_locked() const;
 
 private:
+#ifdef _WIN32
+    HANDLE handle_ = INVALID_HANDLE_VALUE;
+#else
     int fd_ = -1;
+#endif
     std::filesystem::path path_;
 };
 

@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-22.04
+            archive: tar.gz
+          - name: macos-x86_64
+            os: macos-13
+            archive: tar.gz
+          - name: macos-arm64
+            os: macos-latest
+            archive: tar.gz
+          - name: windows-x86_64
+            os: windows-latest
+            archive: zip
+
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DLOOM_STATIC=ON
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --config Release
+
+      - name: Install
+        run: cmake --install build --prefix staging --config Release
+
+      - name: Strip binary (Unix)
+        if: runner.os != 'Windows'
+        run: strip staging/bin/loom
+
+      - name: Package (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          ARCHIVE="loom-${TAG}-${{ matrix.name }}.tar.gz"
+          tar -czf "${ARCHIVE}" -C staging bin/loom
+          echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
+
+      - name: Package (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $archive = "loom-${tag}-${{ matrix.name }}.zip"
+          Compress-Archive -Path staging/bin/loom.exe -DestinationPath $archive
+          echo "ARCHIVE=$archive" >> $env:GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: loom-${{ matrix.name }}
+          path: ${{ env.ARCHIVE }}
+
+  create-release:
+    needs: build-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect release assets
+        run: |
+          mkdir release
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
+          cd release && sha256sum * > checksums-sha256.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release/*

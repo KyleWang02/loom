@@ -1,10 +1,17 @@
 #include "loom/util.hpp"
 #include "loom/log.hpp"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#include <stdio.h>
+#else
 #include <sys/file.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <csignal>
+#endif
+
 #include <atomic>
 #include <iostream>
 #include <cerrno>
@@ -15,6 +22,75 @@ namespace loom {
 // ---------------------------------------------------------------------------
 // FileLock
 // ---------------------------------------------------------------------------
+
+#ifdef _WIN32
+
+FileLock::FileLock(const std::filesystem::path& lock_path)
+    : path_(lock_path)
+{
+    // Create parent directories if they don't exist.
+    std::error_code ec;
+    if (path_.has_parent_path()) {
+        std::filesystem::create_directories(path_.parent_path(), ec);
+        if (ec) {
+            loom::log::warn("failed to create lock dir %s: %s",
+                            path_.parent_path().string().c_str(), ec.message().c_str());
+            return;
+        }
+    }
+
+    handle_ = CreateFileW(
+        path_.wstring().c_str(),
+        GENERIC_READ | GENERIC_WRITE,
+        0,  // no sharing
+        nullptr,
+        OPEN_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
+
+    if (handle_ == INVALID_HANDLE_VALUE) {
+        loom::log::warn("failed to open lock file %s: error %lu",
+                        path_.string().c_str(), GetLastError());
+        return;
+    }
+
+    OVERLAPPED ov = {};
+    // Try non-blocking lock first
+    if (!LockFileEx(handle_, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
+                    0, MAXDWORD, MAXDWORD, &ov)) {
+        if (GetLastError() == ERROR_LOCK_VIOLATION) {
+            loom::log::warn("lock file %s held by another process, waiting...",
+                            path_.string().c_str());
+            // Fall back to blocking lock
+            ov = {};
+            if (!LockFileEx(handle_, LOCKFILE_EXCLUSIVE_LOCK, 0, MAXDWORD, MAXDWORD, &ov)) {
+                loom::log::warn("failed to acquire lock %s: error %lu",
+                                path_.string().c_str(), GetLastError());
+                CloseHandle(handle_);
+                handle_ = INVALID_HANDLE_VALUE;
+            }
+        } else {
+            loom::log::warn("failed to acquire lock %s: error %lu",
+                            path_.string().c_str(), GetLastError());
+            CloseHandle(handle_);
+            handle_ = INVALID_HANDLE_VALUE;
+        }
+    }
+}
+
+FileLock::~FileLock() {
+    if (handle_ != INVALID_HANDLE_VALUE) {
+        OVERLAPPED ov = {};
+        UnlockFileEx(handle_, 0, MAXDWORD, MAXDWORD, &ov);
+        CloseHandle(handle_);
+    }
+}
+
+bool FileLock::is_locked() const {
+    return handle_ != INVALID_HANDLE_VALUE;
+}
+
+#else  // POSIX
 
 FileLock::FileLock(const std::filesystem::path& lock_path)
     : path_(lock_path)
@@ -70,13 +146,23 @@ bool FileLock::is_locked() const {
     return fd_ != -1;
 }
 
+#endif  // _WIN32
+
 // ---------------------------------------------------------------------------
 // Progress
 // ---------------------------------------------------------------------------
 
+static bool stderr_is_tty() {
+#ifdef _WIN32
+    return _isatty(_fileno(stderr)) != 0;
+#else
+    return ::isatty(STDERR_FILENO) != 0;
+#endif
+}
+
 Progress::Progress(const std::string& label, bool enabled)
     : label_(label)
-    , enabled_(enabled && ::isatty(STDERR_FILENO))
+    , enabled_(enabled && stderr_is_tty())
 {
     if (enabled_) {
         std::cerr << "[" << label_ << "] ";
@@ -110,6 +196,22 @@ void Progress::finish(const std::string& message) {
 
 static std::atomic<bool> g_interrupted{false};
 
+#ifdef _WIN32
+
+static BOOL WINAPI console_ctrl_handler(DWORD ctrl_type) {
+    if (ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_BREAK_EVENT) {
+        g_interrupted.store(true, std::memory_order_relaxed);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+void install_signal_handlers() {
+    SetConsoleCtrlHandler(console_ctrl_handler, TRUE);
+}
+
+#else  // POSIX
+
 static void signal_handler(int /*signum*/) {
     g_interrupted.store(true, std::memory_order_relaxed);
 }
@@ -123,6 +225,8 @@ void install_signal_handlers() {
     ::sigaction(SIGINT, &sa, nullptr);
     ::sigaction(SIGTERM, &sa, nullptr);
 }
+
+#endif  // _WIN32
 
 bool is_interrupted() {
     return g_interrupted.load(std::memory_order_relaxed);

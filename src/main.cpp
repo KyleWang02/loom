@@ -5,7 +5,10 @@
 int main(int argc, char* argv[]) {
     using namespace loom;
 
-    CliParser cli("loom", "0.1.0");
+#ifndef LOOM_VERSION
+#define LOOM_VERSION "0.1.0"
+#endif
+    CliParser cli("loom", LOOM_VERSION);
 
     // Global flags
     cli.add_global_flag({"verbose", "v", "Increase output verbosity", false, "", "", true});

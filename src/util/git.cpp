@@ -7,16 +7,144 @@
 #include <sstream>
 #include <unordered_map>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 
 namespace loom {
 
 // ---------------------------------------------------------------------------
 // Subprocess
 // ---------------------------------------------------------------------------
+
+#ifdef _WIN32
+
+Result<CommandResult> run_command(const std::vector<std::string>& args,
+                                  const std::string& working_dir,
+                                  int timeout_seconds) {
+    if (args.empty()) {
+        return LoomError{LoomError::InvalidArg, "run_command: empty args"};
+    }
+
+    // Build command line string (Windows requires a single string)
+    std::string cmd_line;
+    for (size_t i = 0; i < args.size(); ++i) {
+        if (i > 0) cmd_line += ' ';
+        // Quote arguments that contain spaces
+        bool needs_quote = args[i].find(' ') != std::string::npos ||
+                           args[i].find('\t') != std::string::npos ||
+                           args[i].empty();
+        if (needs_quote) cmd_line += '"';
+        cmd_line += args[i];
+        if (needs_quote) cmd_line += '"';
+    }
+
+    // Create pipes for stdout and stderr
+    SECURITY_ATTRIBUTES sa;
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.bInheritHandle = TRUE;
+    sa.lpSecurityDescriptor = nullptr;
+
+    HANDLE stdout_read = nullptr, stdout_write = nullptr;
+    HANDLE stderr_read = nullptr, stderr_write = nullptr;
+
+    if (!CreatePipe(&stdout_read, &stdout_write, &sa, 0) ||
+        !CreatePipe(&stderr_read, &stderr_write, &sa, 0)) {
+        DWORD err = GetLastError();
+        if (stdout_read) CloseHandle(stdout_read);
+        if (stdout_write) CloseHandle(stdout_write);
+        return LoomError{LoomError::IO,
+            "CreatePipe() failed: error " + std::to_string(err)};
+    }
+
+    // Ensure read handles are not inherited
+    SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0);
+    SetHandleInformation(stderr_read, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOA si = {};
+    si.cb = sizeof(STARTUPINFOA);
+    si.hStdOutput = stdout_write;
+    si.hStdError = stderr_write;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.dwFlags |= STARTF_USESTDHANDLES;
+
+    PROCESS_INFORMATION pi = {};
+
+    // Need mutable copy for CreateProcess
+    std::vector<char> cmd_buf(cmd_line.begin(), cmd_line.end());
+    cmd_buf.push_back('\0');
+
+    BOOL ok = CreateProcessA(
+        nullptr,
+        cmd_buf.data(),
+        nullptr,
+        nullptr,
+        TRUE,  // inherit handles
+        0,
+        nullptr,
+        working_dir.empty() ? nullptr : working_dir.c_str(),
+        &si,
+        &pi);
+
+    // Close write ends in parent
+    CloseHandle(stdout_write);
+    CloseHandle(stderr_write);
+
+    if (!ok) {
+        DWORD err = GetLastError();
+        CloseHandle(stdout_read);
+        CloseHandle(stderr_read);
+        return LoomError{LoomError::IO,
+            "CreateProcess() failed: error " + std::to_string(err)};
+    }
+
+    // Read stdout and stderr
+    auto read_pipe = [](HANDLE pipe) -> std::string {
+        std::string result;
+        char buf[4096];
+        DWORD bytes_read;
+        while (ReadFile(pipe, buf, sizeof(buf), &bytes_read, nullptr) && bytes_read > 0) {
+            result.append(buf, bytes_read);
+        }
+        return result;
+    };
+
+    // Wait for process with timeout
+    DWORD timeout_ms = static_cast<DWORD>(timeout_seconds) * 1000;
+    DWORD wait_result = WaitForSingleObject(pi.hProcess, timeout_ms);
+
+    if (wait_result == WAIT_TIMEOUT) {
+        TerminateProcess(pi.hProcess, 1);
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        CloseHandle(stdout_read);
+        CloseHandle(stderr_read);
+        return LoomError{LoomError::IO,
+            "command timed out after " + std::to_string(timeout_seconds) + "s"};
+    }
+
+    std::string out_buf = read_pipe(stdout_read);
+    std::string err_buf = read_pipe(stderr_read);
+
+    DWORD exit_code = 0;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    CloseHandle(stdout_read);
+    CloseHandle(stderr_read);
+
+    return Result<CommandResult>::ok(
+        CommandResult{static_cast<int>(exit_code), std::move(out_buf), std::move(err_buf)});
+}
+
+#else  // POSIX
 
 Result<CommandResult> run_command(const std::vector<std::string>& args,
                                   const std::string& working_dir,
@@ -134,6 +262,8 @@ Result<CommandResult> run_command(const std::vector<std::string>& args,
     close(stderr_pipe[0]);
     return LoomError{LoomError::IO, "unexpected exit from run_command loop"};
 }
+
+#endif  // _WIN32
 
 // ---------------------------------------------------------------------------
 // Tag parsing (pure functions)

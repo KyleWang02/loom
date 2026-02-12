@@ -70,6 +70,31 @@ add_executable(loom
 )
 target_link_libraries(loom loom_core)
 
+# Inject version from CMake into binary
+target_compile_definitions(loom PRIVATE LOOM_VERSION="${PROJECT_VERSION}")
+
+# --- Install ---
+install(TARGETS loom RUNTIME DESTINATION bin)
+
+# Static linking for portable release binaries
+option(LOOM_STATIC "Build statically linked binary" OFF)
+if(LOOM_STATIC)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_link_options(loom PRIVATE -static)
+    elseif(MSVC)
+        set_property(TARGET loom PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+        set_property(TARGET loom_core PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+        set_property(TARGET sqlite3 PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+    endif()
+endif()
+
+# Platform link libraries
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(loom_core pthread dl)
+elseif(WIN32)
+    target_link_libraries(loom_core ws2_32)
+endif()
+
 # Demo programs (for manual real-world testing)
 add_executable(demo_errors demos/demo_errors.cpp)
 target_link_libraries(demo_errors loom_core)

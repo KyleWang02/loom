@@ -584,9 +584,17 @@ BuildCache::BuildCache(BuildCache&&) noexcept = default;
 BuildCache& BuildCache::operator=(BuildCache&&) noexcept = default;
 
 std::string BuildCache::default_cache_path() {
+#ifdef _WIN32
+    const char* appdata = std::getenv("LOCALAPPDATA");
+    if (appdata) return std::string(appdata) + "\\loom\\cache\\loom_cache.db";
+    const char* userprofile = std::getenv("USERPROFILE");
+    if (userprofile) return std::string(userprofile) + "\\.loom\\cache\\loom_cache.db";
+    return "C:\\loom\\cache\\loom_cache.db";
+#else
     const char* home = std::getenv("HOME");
     if (!home) home = "/tmp";
     return std::string(home) + "/.loom/cache/loom_cache.db";
+#endif
 }
 
 Status BuildCache::open(const std::string& db_path) {
@@ -736,12 +744,35 @@ Result<std::string> BuildCache::cached_file_hash(const std::string& path) {
         return LoomError(LoomError::IO, "Cannot stat file: " + canonical);
     }
 
+    // Platform-portable stat field extraction
+#if defined(__APPLE__)
+    int64_t file_mtime_sec = static_cast<int64_t>(st.st_mtimespec.tv_sec);
+    int64_t file_mtime_nsec = static_cast<int64_t>(st.st_mtimespec.tv_nsec);
+#elif defined(_WIN32)
+    int64_t file_mtime_sec = static_cast<int64_t>(st.st_mtime);
+    int64_t file_mtime_nsec = 0;  // Windows stat only provides second granularity
+#else
+    int64_t file_mtime_sec = static_cast<int64_t>(st.st_mtim.tv_sec);
+    int64_t file_mtime_nsec = static_cast<int64_t>(st.st_mtim.tv_nsec);
+#endif
+
+#ifdef _WIN32
+    // No inodes on Windows — use 0 as sentinel
+    uint64_t file_inode = 0;
+#else
+    uint64_t file_inode = static_cast<uint64_t>(st.st_ino);
+#endif
+
     auto cached = lookup_stat(canonical);
     if (cached.is_ok()) {
         auto& e = cached.value();
-        if (e.inode == static_cast<uint64_t>(st.st_ino) &&
-            e.mtime_sec == static_cast<int64_t>(st.st_mtim.tv_sec) &&
-            e.mtime_nsec == static_cast<int64_t>(st.st_mtim.tv_nsec) &&
+        bool inode_ok = true;
+#ifndef _WIN32
+        inode_ok = (e.inode == file_inode);
+#endif
+        if (inode_ok &&
+            e.mtime_sec == file_mtime_sec &&
+            e.mtime_nsec == file_mtime_nsec &&
             e.size == static_cast<int64_t>(st.st_size)) {
             return Result<std::string>::ok(e.content_hash);
         }
@@ -752,9 +783,9 @@ Result<std::string> BuildCache::cached_file_hash(const std::string& path) {
 
     FileStatEntry entry;
     entry.path = canonical;
-    entry.inode = static_cast<uint64_t>(st.st_ino);
-    entry.mtime_sec = static_cast<int64_t>(st.st_mtim.tv_sec);
-    entry.mtime_nsec = static_cast<int64_t>(st.st_mtim.tv_nsec);
+    entry.inode = file_inode;
+    entry.mtime_sec = file_mtime_sec;
+    entry.mtime_nsec = file_mtime_nsec;
     entry.size = static_cast<int64_t>(st.st_size);
     entry.content_hash = hash;
     LOOM_TRY(update_stat(entry));
