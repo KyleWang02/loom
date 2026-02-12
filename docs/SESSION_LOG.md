@@ -3,45 +3,82 @@
 <!-- This file contains ONLY the most recent session. -->
 <!-- Previous sessions are in docs/ARCHIVE.md (cold storage). -->
 
-## 2026-02-07 (Session 10)
+## 2026-02-08 (Session 12)
 
-**Focus**: Phase 11 (Filelist Generation) + Phase 12 (EDA Tool Drivers)
+**Focus**: Phase 15 (CLI Interface) + Phase 16 (Integration, Symbol Remapping, Polish) — ALL PHASES COMPLETE
 
 **Completed**:
-- **Phase 11 — Filelist Generation**: Full `FilelistGenerator` implementation (done in prior session, files already existed):
-  - `filelist.hpp` — FilelistResult, FilelistEntry, FilelistOptions, FilelistGenerator
-  - `filelist.cpp` — Pipeline: parse_all_files → build_unit_graph → build_file_graph → topo_sort → detect
-  - 30 test cases, 96 assertions
-- **Phase 12 — EDA Tool Drivers**: Full implementation:
-  - `tool_types.hpp` — ToolAction enum (Lint/Simulate/Synthesize/Build), ToolResult, ToolOptions, ToolCommand structs
-  - `tool_driver.hpp` — ToolDriver base class with 10 concrete drivers + factory functions
-  - `tool_driver.cpp` — ~500 lines: all driver implementations, options parsing, factory, auto-detect
-  - 10 drivers: IcarusDriver, VerilatorDriver, VivadoSimDriver, VivadoSynthDriver, QuartusDriver, ModelSimDriver, VcsDriver, XceliumDriver, YosysDriver, CustomDriver
-  - Separates command generation (pure, testable) from execution (subprocess via `run_command`)
-  - CustomDriver uses `swap_template()` (strict) for `{{ variable }}` substitution in build_cmd/run_cmd
-  - Factory: `create_driver(name)` for built-in, `create_driver(TargetConfig)` handles "custom"
-  - Auto-detect: `detect_driver(action)` searches PATH with priority ordering
-  - Script-based tools (Vivado, Quartus, ModelSim, Yosys) store script content in `cmd.description`
-  - 39 test cases, 190 assertions, all offline (no real EDA tools needed)
-- All 28 test executables pass (754+ total assertions), 0 regressions
+- **Phase 15 — CLI Interface and Commands**:
+  - `include/loom/cli.hpp` — CLI framework: Flag, CliArgs, Command, CliParser, levenshtein()
+  - `src/cli/cli.cpp` — Two-phase argument parsing, fuzzy command suggestions, grouped help (~440 lines)
+  - 13 command files: cmd_new, cmd_init, cmd_info, cmd_env, cmd_config, cmd_lock, cmd_update, cmd_tree, cmd_clean, cmd_build, cmd_plan, cmd_lint, cmd_doc
+  - `src/main.cpp` — Entry point with 5 global flags + 15 commands (including "test" alias and "fetch")
+  - 25 test cases, 62 assertions — all passing
+  - Verified: `loom --help`, `loom --version`, `loom buld` (suggests "build"), `loom new`, `loom info`, `loom lint`
+- **Phase 16 — Integration, Symbol Remapping, and Polish**:
+  - **Symbol Remapping**: `include/loom/sr.hpp` + `src/lang/verilog_sr.cpp`
+    - SymbolRemapper: detect_collisions(), mangle(), build_remap_table(), remap_tokens(), remap_parse_result()
+    - Collision detection scans top-level (depth==0) design units across all parsed files
+    - Name mangling: `name + "_" + sha256(file_path + ":" + name)[0:8]`
+    - Token remapping: replaces only Identifier tokens, ignores keywords/strings/numbers
+    - Reports: format_report() (GCC-style), format_json()
+    - 27 test cases, 75 assertions
+  - **Polish Utilities**: `include/loom/util.hpp` + `src/util/util.cpp`
+    - FileLock: RAII flock() wrapper, non-blocking first then blocking fallback
+    - Progress: TTY-aware stderr progress indicator with `\r` line rewriting
+    - Signal handling: std::atomic<bool> g_interrupted via sigaction for SIGINT/SIGTERM
+  - **Integration Tests**: `tests/test_integration.cpp`
+    - 15 end-to-end test cases covering: project discover, workspace discover+resolve, filelist pipeline, target filtering, build cache roundtrip, lint engine on real files, doc extractor, SR collision detection, local overrides, lockfile roundtrip, file locking, signal handling
+    - 80 assertions — all passing
+  - **ASan + UBSan**: All 33 tests pass clean under sanitizers
+  - **Final regression**: 33 test executables, 1455+ assertions, 100% pass rate
 
 **Key Decisions**:
-- ToolOptions::from_map() parses CSV for arg lists, bool for waveform, extra keys to `extra` map
-- Script-based tools store TCL/.do/.ys script content in ToolCommand::description (written to disk at execute time)
-- resolve_top_module: option override > filelist detection > "top" fallback
-- CustomDriver uses strict `swap_template()` — errors on undefined `{{ variables }}`
+- Two-phase CLI parsing: scan for subcommand boundary first, then parse global flags and command flags separately
+- SR uses per-file remap tables (FileRemapTable) so each file defining a colliding name gets its own unique mangled name
+- Integration tests use TempDir with write_file() pattern (no git repos needed, unlike test_resolver)
+- FilelistOptions.include_testbenches defaults to false — modules with "tb" in name get filtered by default
 
-**Checkpoint Status**: Phases 0-12 complete. All tests pass.
+**Issues & Fixes**:
+- CLI `parse_flags()` consumed subcommand names as positionals — fixed with two-phase parsing
+- `levenshtein("build", "biuld")` = 2 (not 1), transposition costs 2 in standard Levenshtein
+- Repeatable flag double-counting: set_flag() already increments counts_, so don't also call increment()
+- Integration test used wrong Manifest field names (package_name → package.name) and parse() signature
+- Testbench filtering: tb_top excluded by default heuristic, fixed test to set include_testbenches=true
+
+**Checkpoint Status**: ALL 16 PHASES COMPLETE. Project is feature-complete.
 
 **Next**:
-1. Phase 13: Lint Engine (depends on Phase 5, which is done)
-2. Phase 14: Documentation Generation (depends on Phase 5, which is done)
-3. Phase 15: CLI Interface and Commands
-4. Phase 16: Integration, Symbol Remapping, and Polish
+1. HTML renderer for documentation (deferred from Phase 14)
+2. Template engine with loops/conditionals (deferred from Phase 14)
+3. Offline mode implementation (deferred from Phase 7)
+4. Port connection lint rules (empty-port-connection, missing-port-connection, missing-begin-end — deferred stubs)
+5. Real-world testing on actual Verilog/SV projects
 
 **Files Changed**:
-- `include/loom/tool_types.hpp` (new — ToolAction, ToolResult, ToolOptions, ToolCommand)
-- `include/loom/tool_driver.hpp` (new — ToolDriver base + 10 drivers + factory)
-- `src/util/tool_driver.cpp` (new — full implementation, ~500 lines)
-- `tests/test_tool_driver.cpp` (new — 39 test cases, 190 assertions)
-- `CMakeLists.txt` (modified — added tool_driver.cpp to loom_core, added test_tool_driver target)
+- `include/loom/cli.hpp` (new — CLI framework header)
+- `src/cli/cli.cpp` (new — CLI framework implementation, ~440 lines)
+- `src/cli/cmd_new.cpp` (new)
+- `src/cli/cmd_init.cpp` (new)
+- `src/cli/cmd_info.cpp` (new)
+- `src/cli/cmd_env.cpp` (new)
+- `src/cli/cmd_config.cpp` (new)
+- `src/cli/cmd_lock.cpp` (new)
+- `src/cli/cmd_update.cpp` (new — registers both "update" and "fetch")
+- `src/cli/cmd_tree.cpp` (new)
+- `src/cli/cmd_clean.cpp` (new)
+- `src/cli/cmd_build.cpp` (new — registers both "build" and "test")
+- `src/cli/cmd_plan.cpp` (new)
+- `src/cli/cmd_lint.cpp` (new)
+- `src/cli/cmd_doc.cpp` (new)
+- `src/main.cpp` (new — entry point)
+- `tests/test_cli.cpp` (new — 25 cases, 62 assertions)
+- `include/loom/sr.hpp` (new — Symbol Remapping header)
+- `src/lang/verilog_sr.cpp` (new — SR implementation)
+- `tests/test_sr.cpp` (new — 27 cases, 75 assertions)
+- `include/loom/util.hpp` (new — FileLock, Progress, signal handling)
+- `src/util/util.cpp` (new — polish utilities implementation)
+- `tests/test_integration.cpp` (new — 15 cases, 80 assertions)
+- `CMakeLists.txt` (modified — added all new source files and test targets)
+- `docs/PLAN.md` (modified — all 16 phases marked complete)
+- `CLAUDE.md` (modified — updated current state)

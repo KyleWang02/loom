@@ -99,8 +99,23 @@ include/loom/
                             VivadoSim, VivadoSynth, Quartus, ModelSim, VCS, Xcelium,
                             Yosys, Custom. Factory: create_driver(), detect_driver().
 
-  lint/                     (planned) Lint engine: 22 rules in 3 categories.
-  doc/                      (planned) Documentation generation: extractors + renderers.
+  lint.hpp                  namespace loom::lint. Severity, LintDiagnostic, LintRule
+                            (abstract base with 4 check levels), SuppressionMap,
+                            LintReport, LintEngine. 22 rules (19 active, 3 stubs).
+                            configure(), lint_file(), lint_parsed(), lint_files().
+  doc.hpp                   namespace loom::doc. DocTag (8 kinds), DocComment,
+                            DocExtractor, PortDoc, ParamDoc, DesignUnitDoc,
+                            DocModel (cross-ref resolution), MarkdownRenderer
+                            (index.md, per-unit pages, Mermaid graphs, search_index.json).
+  sr.hpp                    SymbolRemapper class. detect_collisions(), mangle(),
+                            build_remap_table(), remap_tokens(), remap_parse_result().
+                            SymbolCollision, SymbolOrigin, SymbolMap, FileRemapTable.
+                            format_report() (GCC-style), format_json().
+  util.hpp                  FileLock (RAII flock wrapper), Progress (TTY-aware status),
+                            signal handling (install_signal_handlers, is_interrupted).
+  cli.hpp                   CLI framework: Flag, CliArgs, Command, CliParser.
+                            levenshtein() for fuzzy matching. Two-phase parsing.
+                            15 command register_*() forward declarations.
 
 src/util/
   error.cpp                 LoomError::format(), code_name(). Pure string formatting.
@@ -122,8 +137,35 @@ src/util/
   resolver.cpp              BFS dependency resolution, git/path resolution, lockfile building. ~396 lines.
   filelist.cpp              Filelist generation pipeline. ~450 lines.
   tool_driver.cpp           10 EDA tool drivers + factory + options parsing. ~500 lines.
+  lint.cpp                  19 active lint rules + 3 deferred stubs. SuppressionMap,
+                            LintEngine orchestrator. ~520 lines.
+  doc.cpp                   Doc comment parsing, DocExtractor, DocModel cross-refs,
+                            MarkdownRenderer with index + per-unit pages + Mermaid.
+
+  util.cpp                  FileLock (flock), Progress (stderr), signal handling (sigaction).
+
+src/cli/
+  cli.cpp                   CLI framework: CliParser, CliArgs, Command, parse_flags,
+                            levenshtein distance, help text generation. ~440 lines.
+  cmd_new.cpp               loom new <name> — scaffold project with Loom.toml + .gitignore.
+  cmd_init.cpp              loom init [--workspace] — initialize in existing directory.
+  cmd_info.cpp              loom info — display project/workspace metadata.
+  cmd_env.cpp               loom env [--tools] — show environment and EDA tool versions.
+  cmd_config.cpp            loom config [key] [value] — view/set configuration.
+  cmd_lock.cpp              loom lock — resolve dependencies, write Loom.lock.
+  cmd_update.cpp            loom update [package] + loom fetch — re-resolve and download deps.
+  cmd_tree.cpp              loom tree — display dependency tree.
+  cmd_clean.cpp             loom clean [--all] — remove build cache or entire .loom/.
+  cmd_build.cpp             loom build + loom test — full build pipeline with EDA driver.
+  cmd_plan.cpp              loom plan — generate filelist without executing EDA tool.
+  cmd_lint.cpp              loom lint [files...] — lint with severity/format/rule flags.
+  cmd_doc.cpp               loom doc — generate documentation from sources.
+
+src/main.cpp                Entry point. Creates CliParser, registers 5 global flags + 15 commands.
 
 src/lang/
+  verilog_sr.cpp            Symbol remapping: collision detection, SHA-256 name mangling,
+                            token-stream replacement, parse result remapping. ~130 lines.
   lexer.cpp                 ~450-line state machine. Handles identifiers, numbers
                             (decimal/hex/binary/octal/real/x-z), strings, directives,
                             escaped identifiers, line/block/doc/suppression comments,
@@ -172,6 +214,17 @@ tests/
                             testbenches, output formats, target filtering, caching.
   test_tool_driver.cpp      39 cases: action parsing, options parsing, factory, driver identity,
                             command generation for all 10 drivers, helpers, resolve_top_module.
+  test_lint.cpp             60 cases: all 19 active rules, suppression, config overrides,
+                            JSON output, project-level duplicate-module. 213 assertions.
+  test_doc.cpp              50 cases: doc comment parsing, extraction, cross-references,
+                            Markdown rendering, disk output. 273 assertions.
+  test_cli.cpp              25 cases: levenshtein, CliArgs, CliParser (help, version,
+                            fuzzy suggestions, dispatch, flags, positional, pass-through).
+  test_sr.cpp               27 cases: collision detection, name mangling, token remapping,
+                            parse result remapping, report formatting, full pipeline.
+  test_integration.cpp      15 cases: project discover, workspace, filelist pipeline,
+                            target filtering, build cache, lint, doc, SR, overrides,
+                            lockfile roundtrip, file locking, signal handling.
   bench_lexer.cpp           2 benchmarks: 10K lines <100ms (17ms), 50K lines <500ms (71ms).
   bench_graph.cpp           4 benchmarks: 10K nodes topo/cycle/GraphMap all <50ms (<1ms).
   bench_parser.cpp          Parser performance benchmark.
@@ -184,6 +237,13 @@ tests/
 
 demos/
   demo_errors.cpp           CLI demo: chains 4 Result-returning functions with LOOM_TRY.
+  loom_demo.cpp             Real-world CLI harness: loom-demo lint/filelist/resolve.
+                            Accepts files/dirs, recursively scans for .v/.sv.
+                            Flags: --json, --rule, --config, --top, --save.
+  samples/
+    lint/                   10 .sv/.v files targeting specific lint rules.
+    filelist/               6-file module hierarchy for topological sort testing.
+    resolve/                setup.sh + myproject with 3 local git repo deps.
 
 docs/
   research/                 Detailed feature specifications from research agents.
@@ -221,6 +281,11 @@ build_cache.hpp ──depends on──> result.hpp, ir.hpp (pImpl hides sqlite3.
 filelist.hpp ──depends on──> result.hpp, target_expr.hpp, ir.hpp, build_cache.hpp, graph.hpp
 tool_types.hpp ──depends on──> result.hpp
 tool_driver.hpp ──depends on──> tool_types.hpp, filelist.hpp, manifest.hpp, swap.hpp
+lint.hpp ──depends on──> result.hpp, ir.hpp, lexer.hpp, manifest.hpp (for LintConfig)
+doc.hpp ──depends on──> result.hpp, ir.hpp, lexer.hpp
+sr.hpp ──depends on──> result.hpp, ir.hpp, lexer.hpp
+util.hpp ──standalone── (POSIX flock, signals)
+cli.hpp ──depends on──> result.hpp
 
 All src/*.cpp include their corresponding header.
 All tests link against loom_core (static lib) + catch2_main (object lib).
@@ -232,6 +297,13 @@ local_override.cpp uses third_party/tomlplusplus/toml.hpp.
 build_cache.cpp uses third_party/sqlite3/sqlite3.h (internal only, not in public header).
 resolver.cpp uses cache.hpp, git.hpp, manifest.hpp, lockfile.hpp, workspace.hpp, local_override.hpp, graph.hpp.
 tool_driver.cpp uses git.hpp (for run_command), swap.hpp, filelist.hpp, manifest.hpp.
+lint.cpp uses parser.hpp (qualified as loom::parse()), lexer.hpp (loom::lex()), manifest.hpp (LintConfig).
+doc.cpp uses parser.hpp, lexer.hpp, ir.hpp, <filesystem> for render() output.
+verilog_sr.cpp uses ir.hpp, lexer.hpp, sha256.hpp.
+util.cpp uses log.hpp, <sys/file.h>, <csignal>, <atomic>.
+cli.cpp uses cli.hpp, log.hpp.
+cmd_*.cpp use cli.hpp and relevant module headers.
+main.cpp uses cli.hpp and calls all register_*() functions.
 ```
 
 ## Key Patterns

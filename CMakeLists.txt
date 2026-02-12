@@ -48,6 +48,8 @@ add_library(loom_core
     src/util/tool_driver.cpp
     src/util/lint.cpp
     src/util/doc.cpp
+    src/lang/verilog_sr.cpp
+    src/util/util.cpp
 )
 target_include_directories(loom_core PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -55,9 +57,18 @@ target_include_directories(loom_core PUBLIC
 )
 target_link_libraries(loom_core sqlite3)
 
-# Main executable (uncomment when CLI is ready)
-# add_executable(loom src/main.cpp src/cli.cpp)
-# target_link_libraries(loom loom_core)
+# Main executable
+add_executable(loom
+    src/main.cpp
+    src/cli/cli.cpp
+    src/cli/cmd_new.cpp src/cli/cmd_init.cpp
+    src/cli/cmd_info.cpp src/cli/cmd_env.cpp src/cli/cmd_config.cpp
+    src/cli/cmd_lock.cpp src/cli/cmd_update.cpp
+    src/cli/cmd_tree.cpp src/cli/cmd_clean.cpp
+    src/cli/cmd_build.cpp src/cli/cmd_plan.cpp
+    src/cli/cmd_lint.cpp src/cli/cmd_doc.cpp
+)
+target_link_libraries(loom loom_core)
 
 # Demo programs (for manual real-world testing)
 add_executable(demo_errors demos/demo_errors.cpp)
@@ -147,6 +158,13 @@ loom_add_test(test_lint tests/test_lint.cpp)
 
 # Phase 14 tests
 loom_add_test(test_doc tests/test_doc.cpp)
+
+# Phase 15 tests
+loom_add_test(test_cli tests/test_cli.cpp src/cli/cli.cpp)
+
+# Phase 16 tests
+loom_add_test(test_sr tests/test_sr.cpp)
+loom_add_test(test_integration tests/test_integration.cpp)
 
 # Performance benchmarks
 loom_add_test(bench_lexer tests/bench_lexer.cpp)
