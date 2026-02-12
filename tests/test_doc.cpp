@@ -867,3 +867,155 @@ TEST_CASE("render_param_table — empty params produces no output", "[doc]") {
     auto md = renderer.render_unit(*model.find_unit("no_params"), model);
     CHECK(md.find("## Parameters") == std::string::npos);
 }
+
+// ===========================================================================
+// HtmlRenderer tests
+// ===========================================================================
+
+TEST_CASE("HtmlRenderer — empty model renders minimal index", "[doc]") {
+    DocModel model;
+    model.package = {"empty_pkg", "0.0.1", "", {}};
+
+    HtmlRenderer renderer;
+    auto html = renderer.render_index(model);
+
+    CHECK(html.find("<!DOCTYPE html>") != std::string::npos);
+    CHECK(html.find("empty_pkg") != std::string::npos);
+    CHECK(html.find("<h2>Modules</h2>") == std::string::npos);
+    CHECK(html.find("</html>") != std::string::npos);
+}
+
+TEST_CASE("HtmlRenderer — html_escape in output", "[doc]") {
+    auto model = model_from_source(R"(
+/// A module with <special> & "chars".
+module esctest;
+endmodule
+)");
+
+    HtmlRenderer renderer;
+    auto html = renderer.render_unit(*model.find_unit("esctest"), model);
+
+    CHECK(html.find("&lt;special&gt;") != std::string::npos);
+    CHECK(html.find("&amp;") != std::string::npos);
+    CHECK(html.find("&quot;chars&quot;") != std::string::npos);
+}
+
+TEST_CASE("HtmlRenderer — port table directions", "[doc]") {
+    auto model = model_from_source(R"(
+/// Module with ports.
+module test(
+  input  logic a,
+  output logic b,
+  inout  wire  c
+);
+endmodule
+)");
+
+    HtmlRenderer renderer;
+    auto html = renderer.render_unit(*model.find_unit("test"), model);
+
+    CHECK(html.find("<code>a</code>") != std::string::npos);
+    CHECK(html.find("input") != std::string::npos);
+    CHECK(html.find("<code>b</code>") != std::string::npos);
+    CHECK(html.find("output") != std::string::npos);
+    CHECK(html.find("<code>c</code>") != std::string::npos);
+    CHECK(html.find("inout") != std::string::npos);
+}
+
+TEST_CASE("HtmlRenderer — deprecated notice", "[doc]") {
+    auto model = model_from_source(R"(
+/// @deprecated Use new_mod instead.
+module old_mod;
+endmodule
+)");
+
+    HtmlRenderer renderer;
+    auto html = renderer.render_unit(*model.find_unit("old_mod"), model);
+
+    CHECK(html.find("class=\"deprecated\"") != std::string::npos);
+    CHECK(html.find("Deprecated") != std::string::npos);
+    CHECK(html.find("Use new_mod instead") != std::string::npos);
+}
+
+TEST_CASE("HtmlRenderer — dependency graph with mermaid", "[doc]") {
+    auto model = model_from_source(R"(
+/// Top module.
+module top;
+  sub u1();
+endmodule
+
+/// Sub module.
+module sub;
+endmodule
+)");
+    model.resolve_cross_refs();
+
+    HtmlRenderer renderer;
+    auto html = renderer.render_unit(*model.find_unit("top"), model);
+
+    CHECK(html.find("class=\"mermaid\"") != std::string::npos);
+    CHECK(html.find("mermaid.min.js") != std::string::npos);
+    CHECK(html.find("top --> sub") != std::string::npos);
+}
+
+TEST_CASE("HtmlRenderer — index with modules table", "[doc]") {
+    auto model = model_from_source(R"(
+/// Module A description.
+module mod_a; endmodule
+/// Module B description.
+module mod_b; endmodule
+)");
+
+    HtmlRenderer renderer;
+    auto html = renderer.render_index(model);
+
+    CHECK(html.find("<h2>Modules</h2>") != std::string::npos);
+    CHECK(html.find("mod_a.html") != std::string::npos);
+    CHECK(html.find("mod_b.html") != std::string::npos);
+}
+
+TEST_CASE("HtmlRenderer — render to disk", "[doc]") {
+    TempDir tmp;
+    auto model = model_from_source(R"(
+/// Test module.
+module html_test;
+endmodule
+)");
+
+    RenderConfig config;
+    config.output_dir = tmp.path / "html_docs";
+
+    HtmlRenderer renderer(config);
+    auto r = renderer.render(model);
+    REQUIRE(r.is_ok());
+
+    CHECK(fs::exists(tmp.path / "html_docs" / "index.html"));
+    CHECK(fs::exists(tmp.path / "html_docs" / "modules" / "html_test.html"));
+    CHECK(fs::exists(tmp.path / "html_docs" / "search_index.json"));
+}
+
+TEST_CASE("HtmlRenderer — search index uses .html extension", "[doc]") {
+    auto model = model_from_source(R"(
+/// Test mod.
+module si_test; endmodule
+)");
+
+    HtmlRenderer renderer;
+    auto json = renderer.render_search_index(model);
+
+    CHECK(json.find("si_test.html") != std::string::npos);
+    CHECK(json.find(".md") == std::string::npos);
+}
+
+TEST_CASE("HtmlRenderer — nav link back to index", "[doc]") {
+    auto model = model_from_source(R"(
+/// Module with nav.
+module nav_test; endmodule
+)");
+
+    HtmlRenderer renderer;
+    auto html = renderer.render_unit(*model.find_unit("nav_test"), model);
+
+    CHECK(html.find("<nav>") != std::string::npos);
+    CHECK(html.find("index.html") != std::string::npos);
+}

@@ -1,5 +1,8 @@
 #include <catch2/catch.hpp>
 #include <loom/manifest.hpp>
+#include <chrono>
+#include <cstdio>
+#include <sstream>
 
 using namespace loom;
 
@@ -302,4 +305,149 @@ version = "0.1.0"
     REQUIRE(r.value().dependencies.empty());
     REQUIRE(r.value().sources.empty());
     REQUIRE(r.value().targets.empty());
+}
+
+// ===== Roundtrip (to_toml / save) =====
+
+TEST_CASE("roundtrip — minimal manifest", "[manifest]") {
+    auto r1 = Manifest::parse(R"(
+[package]
+name = "roundtrip"
+version = "2.0.0"
+)");
+    REQUIRE(r1.is_ok());
+    auto& m1 = r1.value();
+
+    // Serialize and re-parse
+    std::ostringstream ss;
+    ss << m1.to_toml();
+    auto r2 = Manifest::parse(ss.str());
+    REQUIRE(r2.is_ok());
+    auto& m2 = r2.value();
+    CHECK(m2.package.name == "roundtrip");
+    CHECK(m2.package.version == "2.0.0");
+}
+
+TEST_CASE("roundtrip — manifest with dependencies", "[manifest]") {
+    auto r1 = Manifest::parse(R"(
+[package]
+name = "test"
+version = "0.1.0"
+
+[dependencies]
+uart = { git = "https://example.com/uart.git", tag = "v1.0" }
+spi = { path = "../spi" }
+)");
+    REQUIRE(r1.is_ok());
+    auto& m1 = r1.value();
+
+    std::ostringstream ss;
+    ss << m1.to_toml();
+    auto r2 = Manifest::parse(ss.str());
+    REQUIRE(r2.is_ok());
+    auto& m2 = r2.value();
+    REQUIRE(m2.dependencies.size() == 2);
+
+    // Find deps by name (order may differ)
+    const Dependency* uart = nullptr;
+    const Dependency* spi = nullptr;
+    for (auto& d : m2.dependencies) {
+        if (d.name == "uart") uart = &d;
+        if (d.name == "spi") spi = &d;
+    }
+    REQUIRE(uart != nullptr);
+    REQUIRE(spi != nullptr);
+    CHECK(uart->git->url == "https://example.com/uart.git");
+    CHECK(uart->git->tag.value() == "v1.0");
+    CHECK(spi->path->path == "../spi");
+}
+
+TEST_CASE("roundtrip — manifest with lint config", "[manifest]") {
+    auto r1 = Manifest::parse(R"(
+[package]
+name = "test"
+version = "0.1.0"
+
+[lint]
+blocking-in-ff = "off"
+casex-usage = "error"
+
+[lint.naming]
+module = "^[a-z][a-z0-9_]*$"
+)");
+    REQUIRE(r1.is_ok());
+    auto& m1 = r1.value();
+
+    std::ostringstream ss;
+    ss << m1.to_toml();
+    auto r2 = Manifest::parse(ss.str());
+    REQUIRE(r2.is_ok());
+    auto& m2 = r2.value();
+    CHECK(m2.lint.rules.at("blocking-in-ff") == "off");
+    CHECK(m2.lint.rules.at("casex-usage") == "error");
+    CHECK(m2.lint.naming.at("module") == "^[a-z][a-z0-9_]*$");
+}
+
+TEST_CASE("roundtrip — manifest with build config", "[manifest]") {
+    auto r1 = Manifest::parse(R"(
+[package]
+name = "test"
+version = "0.1.0"
+
+[build]
+pre-lint = true
+lint-fatal = true
+)");
+    REQUIRE(r1.is_ok());
+
+    std::ostringstream ss;
+    ss << r1.value().to_toml();
+    auto r2 = Manifest::parse(ss.str());
+    REQUIRE(r2.is_ok());
+    CHECK(r2.value().build.pre_lint);
+    CHECK(r2.value().build.lint_fatal);
+}
+
+TEST_CASE("roundtrip — manifest with workspace", "[manifest]") {
+    auto r1 = Manifest::parse(R"(
+[package]
+name = "ws-root"
+version = "0.1.0"
+
+[workspace]
+members = ["core", "tb"]
+exclude = ["vendor"]
+)");
+    REQUIRE(r1.is_ok());
+
+    std::ostringstream ss;
+    ss << r1.value().to_toml();
+    auto r2 = Manifest::parse(ss.str());
+    REQUIRE(r2.is_ok());
+    REQUIRE(r2.value().workspace.has_value());
+    CHECK(r2.value().workspace->members.size() == 2);
+    CHECK(r2.value().workspace->exclude.size() == 1);
+}
+
+TEST_CASE("save — writes to file and reloads", "[manifest]") {
+    auto r1 = Manifest::parse(R"(
+[package]
+name = "saved"
+version = "3.0.0"
+)");
+    REQUIRE(r1.is_ok());
+
+    auto tmp_path = std::string("/tmp/loom_test_manifest_") +
+        std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+        ".toml";
+    auto status = r1.value().save(tmp_path);
+    REQUIRE(status.is_ok());
+
+    auto r2 = Manifest::load(tmp_path);
+    REQUIRE(r2.is_ok());
+    CHECK(r2.value().package.name == "saved");
+    CHECK(r2.value().package.version == "3.0.0");
+
+    // Cleanup
+    std::remove(tmp_path.c_str());
 }

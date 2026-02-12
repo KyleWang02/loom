@@ -5,6 +5,7 @@
 #include <loom/name.hpp>
 #include <loom/source.hpp>
 #include <loom/target_expr.hpp>
+#include <tomlplusplus/toml.hpp>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -66,6 +67,12 @@ struct Manifest {
 
     // Parse from file path
     static Result<Manifest> load(const std::string& path);
+
+    // Serialize to TOML table
+    toml::table to_toml() const;
+
+    // Write manifest to file
+    Status save(const std::string& path) const;
 
     // Check if this is a workspace root (has [workspace] section)
     bool is_workspace() const;

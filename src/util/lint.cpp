@@ -657,37 +657,171 @@ public:
 };
 
 // ===========================================================================
-// Deferred stub rules (no-op)
+// Port connection lint rules
 // ===========================================================================
 
 class EmptyPortConnectionRule : public LintRule {
 public:
     std::string id() const override { return "empty-port-connection"; }
     std::string description() const override {
-        return "Empty port connection in instantiation (deferred)";
+        return "Empty port connection in instantiation";
     }
     RuleCategory category() const override { return RuleCategory::Correctness; }
     Severity default_severity() const override { return Severity::Warn; }
+
+    void check(const DesignUnit& unit,
+               const std::string& filename,
+               std::vector<LintDiagnostic>& out) override {
+        for (auto& inst : unit.instantiations) {
+            for (auto& pc : inst.port_connections) {
+                if (pc.is_empty) {
+                    emit(out, default_severity(), filename,
+                         pc.pos.line, pc.pos.col,
+                         "empty port connection '." + pc.port_name +
+                         "()' in instantiation of '" + inst.module_name + "'");
+                }
+            }
+        }
+    }
 };
 
 class MissingPortConnectionRule : public LintRule {
 public:
     std::string id() const override { return "missing-port-connection"; }
     std::string description() const override {
-        return "Missing port connection in instantiation (deferred)";
+        return "Missing port connection in instantiation";
     }
     RuleCategory category() const override { return RuleCategory::Correctness; }
     Severity default_severity() const override { return Severity::Warn; }
+
+    void check_project(
+        const std::vector<std::pair<std::string, ParseResult>>& all_files,
+        std::vector<LintDiagnostic>& out) override {
+        // Build module -> port names map from definitions
+        std::unordered_map<std::string, std::vector<std::string>> module_ports;
+        for (auto& [filename, pr] : all_files) {
+            for (auto& unit : pr.units) {
+                if (unit.depth != 0) continue;
+                if (unit.kind != DesignUnitKind::Module &&
+                    unit.kind != DesignUnitKind::Interface) continue;
+                std::vector<std::string> port_names;
+                for (auto& p : unit.ports) {
+                    port_names.push_back(p.name);
+                }
+                module_ports[unit.name] = std::move(port_names);
+            }
+        }
+
+        // Check instantiations against definitions
+        for (auto& [filename, pr] : all_files) {
+            for (auto& unit : pr.units) {
+                for (auto& inst : unit.instantiations) {
+                    auto it = module_ports.find(inst.module_name);
+                    if (it == module_ports.end()) continue; // black box
+
+                    // Skip if any wildcard connection
+                    bool has_wildcard = false;
+                    bool has_positional = false;
+                    for (auto& pc : inst.port_connections) {
+                        if (pc.is_wildcard) { has_wildcard = true; break; }
+                        if (pc.is_positional) { has_positional = true; break; }
+                    }
+                    if (has_wildcard || has_positional) continue;
+
+                    // Build set of connected port names
+                    std::unordered_set<std::string> connected;
+                    for (auto& pc : inst.port_connections) {
+                        if (!pc.port_name.empty()) {
+                            connected.insert(pc.port_name);
+                        }
+                    }
+
+                    // Report missing ports
+                    for (auto& port_name : it->second) {
+                        if (connected.find(port_name) == connected.end()) {
+                            emit(out, default_severity(), filename,
+                                 inst.pos.line, inst.pos.col,
+                                 "missing port connection '." + port_name +
+                                 "' in instantiation of '" + inst.module_name + "'");
+                        }
+                    }
+                }
+            }
+        }
+    }
 };
 
 class MissingBeginEndRule : public LintRule {
 public:
     std::string id() const override { return "missing-begin-end"; }
     std::string description() const override {
-        return "Missing begin/end around multi-line block (deferred)";
+        return "Missing begin/end around always block";
     }
     RuleCategory category() const override { return RuleCategory::Structure; }
     Severity default_severity() const override { return Severity::Warn; }
+
+    void check_tokens(const LexResult& lex_result,
+                      const std::string& filename,
+                      std::vector<LintDiagnostic>& out) override {
+        using TT = VerilogTokenType;
+        auto& tokens = lex_result.tokens;
+
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            auto t = tokens[i].type;
+            bool is_always = false;
+            size_t check_pos = i + 1;
+
+            if (t == TT::KwAlwaysComb || t == TT::KwAlwaysFf ||
+                t == TT::KwAlwaysLatch) {
+                is_always = true;
+                // For always_ff, skip @(...) sensitivity list
+                if (t == TT::KwAlwaysFf) {
+                    size_t j = i + 1;
+                    // Skip whitespace-like tokens to find @
+                    while (j < tokens.size() &&
+                           tokens[j].type == TT::At) {
+                        ++j; // skip @
+                        if (j < tokens.size() && tokens[j].type == TT::LParen) {
+                            int depth = 1;
+                            ++j;
+                            while (j < tokens.size() && depth > 0) {
+                                if (tokens[j].type == TT::LParen) ++depth;
+                                else if (tokens[j].type == TT::RParen) --depth;
+                                ++j;
+                            }
+                        }
+                        break;
+                    }
+                    check_pos = j;
+                }
+            } else if (t == TT::KwAlways) {
+                is_always = true;
+                // Skip @(...) sensitivity list
+                size_t j = i + 1;
+                if (j < tokens.size() && tokens[j].type == TT::At) {
+                    ++j; // skip @
+                    if (j < tokens.size() && tokens[j].type == TT::LParen) {
+                        int depth = 1;
+                        ++j;
+                        while (j < tokens.size() && depth > 0) {
+                            if (tokens[j].type == TT::LParen) ++depth;
+                            else if (tokens[j].type == TT::RParen) --depth;
+                            ++j;
+                        }
+                    }
+                }
+                check_pos = j;
+            }
+
+            if (is_always && check_pos < tokens.size()) {
+                if (tokens[check_pos].type != TT::KwBegin) {
+                    emit(out, default_severity(), filename,
+                         tokens[i].pos.line, tokens[i].pos.col,
+                         "always block without begin/end");
+                }
+            }
+        }
+    }
 };
 
 // ===========================================================================

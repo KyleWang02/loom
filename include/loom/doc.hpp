@@ -172,4 +172,34 @@ private:
     std::string kind_dir(DesignUnitKind kind) const;
 };
 
+// ---------------------------------------------------------------------------
+// HtmlRenderer — render DocModel to HTML files
+// ---------------------------------------------------------------------------
+
+class HtmlRenderer {
+public:
+    explicit HtmlRenderer(RenderConfig config = {});
+
+    // Render the full documentation to disk
+    Result<std::monostate> render(const DocModel& model);
+
+    // Individual rendering (testable, return string content)
+    std::string render_index(const DocModel& model);
+    std::string render_unit(const DesignUnitDoc& unit, const DocModel& model);
+    std::string render_search_index(const DocModel& model);
+
+private:
+    RenderConfig config_;
+
+    std::string html_escape(const std::string& text) const;
+    std::string render_param_table(const std::vector<ParamDoc>& params);
+    std::string render_port_table(const std::vector<PortDoc>& ports);
+    std::string render_mermaid_graph(const DocModel& model);
+    std::string render_unit_graph(const DesignUnitDoc& unit, const DocModel& model);
+    std::string html_head(const std::string& title) const;
+    std::string html_footer() const;
+    std::string kind_name(DesignUnitKind kind) const;
+    std::string kind_dir(DesignUnitKind kind) const;
+};
+
 } // namespace loom::doc

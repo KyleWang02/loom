@@ -204,7 +204,14 @@ TEST_CASE("Serialization roundtrip: ParseResult with all field types", "[build_c
     u.params.push_back({"WIDTH", "8", false, {"test.sv", 5, 5}});
     u.params.push_back({"DEPTH", "16", true, {"test.sv", 6, 5}});
 
-    u.instantiations.push_back({"sub_mod", "u_sub", true, {"test.sv", 10, 5}});
+    {
+        loom::Instantiation inst;
+        inst.module_name = "sub_mod";
+        inst.instance_name = "u_sub";
+        inst.is_parameterized = true;
+        inst.pos = {"test.sv", 10, 5};
+        u.instantiations.push_back(std::move(inst));
+    }
 
     u.imports.push_back({"pkg_a", "*", true, {"test.sv", 7, 5}});
     u.imports.push_back({"pkg_b", "CONST", false, {"test.sv", 8, 5}});

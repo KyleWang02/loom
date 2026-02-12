@@ -761,3 +761,101 @@ TEST_CASE("parse multiple imports", "[parser]") {
     CHECK(imps[1].package_name == "pkg_b");
     CHECK(imps[1].symbol == "func_b");
 }
+
+// ===== Port Connection Extraction =====
+
+TEST_CASE("parse named port connections", "[parser]") {
+    auto r = lex_and_parse(
+        "module top;\n"
+        "  sub u1(.clk(clk_i), .data(data_o));\n"
+        "endmodule\n",
+        true
+    );
+    REQUIRE(r.units.size() == 1);
+    REQUIRE(r.units[0].instantiations.size() == 1);
+    auto& pcs = r.units[0].instantiations[0].port_connections;
+    REQUIRE(pcs.size() == 2);
+    CHECK(pcs[0].port_name == "clk");
+    CHECK(pcs[0].signal_expr == "clk_i");
+    CHECK_FALSE(pcs[0].is_empty);
+    CHECK_FALSE(pcs[0].is_positional);
+    CHECK_FALSE(pcs[0].is_wildcard);
+    CHECK(pcs[1].port_name == "data");
+    CHECK(pcs[1].signal_expr == "data_o");
+}
+
+TEST_CASE("parse empty port connection", "[parser]") {
+    auto r = lex_and_parse(
+        "module top;\n"
+        "  sub u1(.clk(clk_i), .unused());\n"
+        "endmodule\n",
+        true
+    );
+    REQUIRE(r.units.size() == 1);
+    auto& pcs = r.units[0].instantiations[0].port_connections;
+    REQUIRE(pcs.size() == 2);
+    CHECK(pcs[1].port_name == "unused");
+    CHECK(pcs[1].is_empty);
+    CHECK(pcs[1].signal_expr.empty());
+}
+
+TEST_CASE("parse wildcard port connection", "[parser]") {
+    auto r = lex_and_parse(
+        "module top;\n"
+        "  sub u1(.*, .extra(x));\n"
+        "endmodule\n",
+        true
+    );
+    REQUIRE(r.units.size() == 1);
+    auto& pcs = r.units[0].instantiations[0].port_connections;
+    REQUIRE(pcs.size() == 2);
+    CHECK(pcs[0].is_wildcard);
+    CHECK(pcs[1].port_name == "extra");
+    CHECK(pcs[1].signal_expr == "x");
+}
+
+TEST_CASE("parse positional port connections", "[parser]") {
+    auto r = lex_and_parse(
+        "module top;\n"
+        "  sub u1(a, b, c);\n"
+        "endmodule\n",
+        true
+    );
+    REQUIRE(r.units.size() == 1);
+    auto& pcs = r.units[0].instantiations[0].port_connections;
+    REQUIRE(pcs.size() == 3);
+    CHECK(pcs[0].is_positional);
+    CHECK(pcs[0].signal_expr == "a");
+    CHECK(pcs[1].signal_expr == "b");
+    CHECK(pcs[2].signal_expr == "c");
+}
+
+TEST_CASE("parse parameterized instantiation port connections", "[parser]") {
+    auto r = lex_and_parse(
+        "module top;\n"
+        "  sub #(.W(8)) u1(.clk(clk_i), .d(data));\n"
+        "endmodule\n",
+        true
+    );
+    REQUIRE(r.units.size() == 1);
+    auto& inst = r.units[0].instantiations[0];
+    CHECK(inst.is_parameterized);
+    REQUIRE(inst.port_connections.size() == 2);
+    CHECK(inst.port_connections[0].port_name == "clk");
+    CHECK(inst.port_connections[1].port_name == "d");
+}
+
+TEST_CASE("parse port connection with function call expression", "[parser]") {
+    auto r = lex_and_parse(
+        "module top;\n"
+        "  sub u1(.out(func(a, b)));\n"
+        "endmodule\n",
+        true
+    );
+    REQUIRE(r.units.size() == 1);
+    auto& pcs = r.units[0].instantiations[0].port_connections;
+    REQUIRE(pcs.size() == 1);
+    CHECK(pcs[0].port_name == "out");
+    CHECK(pcs[0].signal_expr.find("func") != std::string::npos);
+    CHECK(pcs[0].signal_expr.find("a") != std::string::npos);
+}

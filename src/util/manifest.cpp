@@ -282,4 +282,172 @@ bool Manifest::is_workspace() const {
     return workspace.has_value();
 }
 
+// ---------------------------------------------------------------------------
+// Manifest::to_toml
+// ---------------------------------------------------------------------------
+
+static toml::table dep_to_toml(const Dependency& dep) {
+    toml::table t;
+    if (dep.workspace) {
+        t.insert("workspace", true);
+    }
+    if (dep.member) {
+        t.insert("member", true);
+    }
+    if (dep.git) {
+        t.insert("git", dep.git->url);
+        if (dep.git->tag) t.insert("tag", *dep.git->tag);
+        if (dep.git->version) t.insert("version", *dep.git->version);
+        if (dep.git->rev) t.insert("rev", *dep.git->rev);
+        if (dep.git->branch) t.insert("branch", *dep.git->branch);
+    }
+    if (dep.path) {
+        t.insert("path", dep.path->path);
+    }
+    return t;
+}
+
+toml::table Manifest::to_toml() const {
+    toml::table doc;
+
+    // [package]
+    {
+        toml::table pkg;
+        if (!package.name.empty()) pkg.insert("name", package.name);
+        if (!package.version.empty()) pkg.insert("version", package.version);
+        if (!package.top.empty()) pkg.insert("top", package.top);
+        if (!package.authors.empty()) {
+            toml::array arr;
+            for (auto& a : package.authors) arr.push_back(a);
+            pkg.insert("authors", std::move(arr));
+        }
+        if (!pkg.empty()) doc.insert("package", std::move(pkg));
+    }
+
+    // [dependencies]
+    if (!dependencies.empty()) {
+        toml::table deps;
+        for (auto& dep : dependencies) {
+            deps.insert(dep.name, dep_to_toml(dep));
+        }
+        doc.insert("dependencies", std::move(deps));
+    }
+
+    // [[sources]]
+    if (!sources.empty()) {
+        toml::array arr;
+        for (auto& sg : sources) {
+            toml::table t;
+            if (sg.target) {
+                t.insert("target", sg.target->to_string());
+            }
+            if (!sg.files.empty()) {
+                toml::array files;
+                for (auto& f : sg.files) files.push_back(f);
+                t.insert("files", std::move(files));
+            }
+            if (!sg.include_dirs.empty()) {
+                toml::array dirs;
+                for (auto& d : sg.include_dirs) dirs.push_back(d);
+                t.insert("include_dirs", std::move(dirs));
+            }
+            if (!sg.defines.empty()) {
+                toml::array defs;
+                for (auto& d : sg.defines) defs.push_back(d);
+                t.insert("defines", std::move(defs));
+            }
+            arr.push_back(std::move(t));
+        }
+        doc.insert("sources", std::move(arr));
+    }
+
+    // [targets.*]
+    if (!targets.empty()) {
+        toml::table targets_tbl;
+        for (auto& [name, tc] : targets) {
+            toml::table t;
+            if (!tc.tool.empty()) t.insert("tool", tc.tool);
+            if (!tc.action.empty()) t.insert("action", tc.action);
+            if (!tc.options.empty()) {
+                toml::table opts;
+                for (auto& [k, v] : tc.options) {
+                    opts.insert(k, v);
+                }
+                t.insert("options", std::move(opts));
+            }
+            targets_tbl.insert(name, std::move(t));
+        }
+        doc.insert("targets", std::move(targets_tbl));
+    }
+
+    // [lint]
+    if (!lint.rules.empty() || !lint.naming.empty()) {
+        toml::table lint_tbl;
+        for (auto& [k, v] : lint.rules) {
+            lint_tbl.insert(k, v);
+        }
+        if (!lint.naming.empty()) {
+            toml::table naming;
+            for (auto& [k, v] : lint.naming) {
+                naming.insert(k, v);
+            }
+            lint_tbl.insert("naming", std::move(naming));
+        }
+        doc.insert("lint", std::move(lint_tbl));
+    }
+
+    // [build]
+    if (build.pre_lint || build.lint_fatal) {
+        toml::table build_tbl;
+        if (build.pre_lint) build_tbl.insert("pre-lint", true);
+        if (build.lint_fatal) build_tbl.insert("lint-fatal", true);
+        doc.insert("build", std::move(build_tbl));
+    }
+
+    // [workspace]
+    if (workspace) {
+        toml::table ws;
+        if (!workspace->members.empty()) {
+            toml::array arr;
+            for (auto& m : workspace->members) arr.push_back(m);
+            ws.insert("members", std::move(arr));
+        }
+        if (!workspace->exclude.empty()) {
+            toml::array arr;
+            for (auto& e : workspace->exclude) arr.push_back(e);
+            ws.insert("exclude", std::move(arr));
+        }
+        if (!workspace->default_members.empty()) {
+            toml::array arr;
+            for (auto& d : workspace->default_members) arr.push_back(d);
+            ws.insert("default-members", std::move(arr));
+        }
+        if (!workspace->dependencies.empty()) {
+            toml::table deps;
+            for (auto& dep : workspace->dependencies) {
+                deps.insert(dep.name, dep_to_toml(dep));
+            }
+            ws.insert("dependencies", std::move(deps));
+        }
+        doc.insert("workspace", std::move(ws));
+    }
+
+    return doc;
+}
+
+// ---------------------------------------------------------------------------
+// Manifest::save
+// ---------------------------------------------------------------------------
+
+Status Manifest::save(const std::string& path) const {
+    std::ofstream file(path);
+    if (!file.is_open()) {
+        return LoomError{LoomError::IO,
+            "cannot open manifest file for writing: " + path};
+    }
+    file << to_toml();
+    file.close();
+    return ok_status();
+}
+
 } // namespace loom

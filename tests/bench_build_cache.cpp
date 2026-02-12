@@ -46,10 +46,12 @@ static ParseResult make_parse_result(int module_index) {
     du.params.push_back({"DEPTH", "16", false, {du.name, 2, 28}});
 
     if (module_index > 0) {
-        du.instantiations.push_back({
-            "mod_" + std::to_string(module_index - 1),
-            "u_sub", true, {du.name, 20, 4}
-        });
+        Instantiation inst;
+        inst.module_name = "mod_" + std::to_string(module_index - 1);
+        inst.instance_name = "u_sub";
+        inst.is_parameterized = true;
+        inst.pos = {du.name, 20, 4};
+        du.instantiations.push_back(std::move(inst));
     }
 
     AlwaysBlock ab;

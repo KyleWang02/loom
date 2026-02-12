@@ -57,10 +57,20 @@ struct ParamDecl {
     SourcePos pos;
 };
 
+struct PortConnection {
+    std::string port_name;      // Named: "clk"; empty if positional
+    std::string signal_expr;    // Connected expression text
+    bool is_empty = false;      // .data() with no expression
+    bool is_positional = false; // No dot-name prefix
+    bool is_wildcard = false;   // .*
+    SourcePos pos;
+};
+
 struct Instantiation {
     std::string module_name;    // instantiated module/interface name
     std::string instance_name;  // instance identifier
     bool is_parameterized = false;
+    std::vector<PortConnection> port_connections;
     SourcePos pos;
 };
 

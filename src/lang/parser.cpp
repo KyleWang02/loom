@@ -545,6 +545,81 @@ struct Parser {
         match(TT::Semicolon);
     }
 
+    // -- Port connection parsing ---------------------------------------------
+
+    std::vector<PortConnection> parse_port_connections() {
+        std::vector<PortConnection> conns;
+        if (!match(TT::LParen)) return conns;
+
+        // Handle empty ()
+        if (match(TT::RParen)) return conns;
+
+        while (!at_end()) {
+            PortConnection pc;
+            pc.pos = peek().pos;
+
+            if (check(TT::Dot)) {
+                advance(); // consume '.'
+                // Check for .* (wildcard)
+                if (check(TT::Star)) {
+                    pc.is_wildcard = true;
+                    advance(); // consume '*'
+                } else if (check(TT::Identifier)) {
+                    pc.port_name = peek().text;
+                    advance(); // consume port name
+                    // Expect ( expr ) or ()
+                    if (match(TT::LParen)) {
+                        if (check(TT::RParen)) {
+                            // .port() — empty connection
+                            pc.is_empty = true;
+                            advance();
+                        } else {
+                            // .port(expr) — collect expression text
+                            std::string expr;
+                            int depth = 1;
+                            while (!at_end() && depth > 0) {
+                                auto t = peek().type;
+                                if (t == TT::LParen) ++depth;
+                                else if (t == TT::RParen) {
+                                    --depth;
+                                    if (depth == 0) break;
+                                }
+                                if (!expr.empty()) expr += " ";
+                                expr += peek().text;
+                                advance();
+                            }
+                            pc.signal_expr = expr;
+                            match(TT::RParen);
+                        }
+                    }
+                }
+            } else {
+                // Positional connection — collect expression text
+                pc.is_positional = true;
+                std::string expr;
+                int paren_depth = 0;
+                while (!at_end()) {
+                    auto t = peek().type;
+                    if (t == TT::LParen) ++paren_depth;
+                    else if (t == TT::RParen) {
+                        if (paren_depth == 0) break;
+                        --paren_depth;
+                    }
+                    else if (t == TT::Comma && paren_depth == 0) break;
+                    if (!expr.empty()) expr += " ";
+                    expr += peek().text;
+                    advance();
+                }
+                pc.signal_expr = expr;
+            }
+
+            conns.push_back(std::move(pc));
+            if (!match(TT::Comma)) break;
+        }
+        match(TT::RParen);
+        return conns;
+    }
+
     // -- Instantiation detection --------------------------------------------
 
     bool try_parse_instantiation(DesignUnit& unit) {
@@ -580,7 +655,7 @@ struct Parser {
 
                 // Port connections (...)
                 if (check(TT::LParen)) {
-                    skip_balanced(TT::LParen, TT::RParen);
+                    inst.port_connections = parse_port_connections();
                 }
                 match(TT::Semicolon);
 
@@ -607,7 +682,7 @@ struct Parser {
 
                 // Port connections
                 if (check(TT::LParen)) {
-                    skip_balanced(TT::LParen, TT::RParen);
+                    inst.port_connections = parse_port_connections();
                 }
                 match(TT::Semicolon);
 

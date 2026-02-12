@@ -848,15 +848,116 @@ endmodule
     CHECK(report.files_checked == 1);
 }
 
-TEST_CASE("deferred rules are no-ops", "[lint]") {
+TEST_CASE("empty-port-connection — detects .port() pattern", "[lint]") {
     auto report = lint_source(R"(
 `default_nettype none
 module test;
   sub u1(.a(), .b(x));
 endmodule
 )");
-    // Deferred rules should never fire
+    CHECK(has_diag(report, "empty-port-connection"));
+    auto diags = find_diags(report, "empty-port-connection");
+    REQUIRE(diags.size() == 1);
+    CHECK(diags[0].message.find(".a()") != std::string::npos);
+}
+
+TEST_CASE("empty-port-connection — no false positive on connected ports", "[lint]") {
+    auto report = lint_source(R"(
+`default_nettype none
+module test;
+  sub u1(.a(x), .b(y));
+endmodule
+)");
     CHECK_FALSE(has_diag(report, "empty-port-connection"));
-    CHECK_FALSE(has_diag(report, "missing-port-connection"));
+}
+
+TEST_CASE("missing-port-connection — detects missing ports", "[lint]") {
+    TempDir tmp;
+    auto path1 = tmp.write_file("sub.sv", R"(
+`default_nettype none
+module sub(input logic a, input logic b, output logic c);
+endmodule
+)");
+    auto path2 = tmp.write_file("top.sv", R"(
+`default_nettype none
+module top;
+  sub u1(.a(x), .c(z));
+endmodule
+)");
+    LintEngine engine;
+    auto result = engine.lint_files({path1, path2});
+    REQUIRE(result.is_ok());
+    auto& report = result.value();
+    CHECK(has_diag(report, "missing-port-connection"));
+    auto diags = find_diags(report, "missing-port-connection");
+    REQUIRE(diags.size() == 1);
+    CHECK(diags[0].message.find(".b") != std::string::npos);
+}
+
+TEST_CASE("missing-port-connection — wildcard skips check", "[lint]") {
+    TempDir tmp;
+    auto path1 = tmp.write_file("sub.sv", R"(
+`default_nettype none
+module sub(input logic a, input logic b);
+endmodule
+)");
+    auto path2 = tmp.write_file("top.sv", R"(
+`default_nettype none
+module top;
+  sub u1(.*);
+endmodule
+)");
+    LintEngine engine;
+    auto result = engine.lint_files({path1, path2});
+    REQUIRE(result.is_ok());
+    CHECK_FALSE(has_diag(result.value(), "missing-port-connection"));
+}
+
+TEST_CASE("missing-begin-end — detects always without begin", "[lint]") {
+    auto report = lint_source(R"(
+`default_nettype none
+module test;
+  logic a, b;
+  always_comb
+    a = b;
+endmodule
+)");
+    CHECK(has_diag(report, "missing-begin-end"));
+}
+
+TEST_CASE("missing-begin-end — no false positive with begin", "[lint]") {
+    auto report = lint_source(R"(
+`default_nettype none
+module test;
+  logic a, b;
+  always_comb begin
+    a = b;
+  end
+endmodule
+)");
     CHECK_FALSE(has_diag(report, "missing-begin-end"));
+}
+
+TEST_CASE("missing-begin-end — always_ff with sensitivity list", "[lint]") {
+    auto report = lint_source(R"(
+`default_nettype none
+module test;
+  logic clk, a, b;
+  always_ff @(posedge clk)
+    a <= b;
+endmodule
+)");
+    CHECK(has_diag(report, "missing-begin-end"));
+}
+
+TEST_CASE("missing-begin-end — plain always @(*)", "[lint]") {
+    auto report = lint_source(R"(
+`default_nettype none
+module test;
+  logic a, b;
+  always @(*)
+    a = b;
+endmodule
+)");
+    CHECK(has_diag(report, "missing-begin-end"));
 }

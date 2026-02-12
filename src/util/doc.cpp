@@ -751,4 +751,380 @@ Result<std::monostate> MarkdownRenderer::render(const DocModel& model) {
     return ok_status();
 }
 
+// ===========================================================================
+// HtmlRenderer
+// ===========================================================================
+
+static const char* CSS_STYLE = R"CSS(
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+       max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; color: #333; }
+h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+h2 { border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 30px; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+th { background: #f5f5f5; font-weight: 600; }
+tr:nth-child(even) { background: #fafafa; }
+code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+pre { background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+a { color: #0366d6; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.deprecated { background: #fff3cd; border: 1px solid #ffc107; padding: 10px; border-radius: 5px; margin: 10px 0; }
+.note { background: #d1ecf1; border: 1px solid #bee5eb; padding: 10px; border-radius: 5px; margin: 10px 0; }
+.warning { background: #f8d7da; border: 1px solid #f5c6cb; padding: 10px; border-radius: 5px; margin: 10px 0; }
+.source-loc { color: #666; font-size: 0.9em; }
+nav { margin-bottom: 20px; }
+nav a { margin-right: 15px; }
+)CSS";
+
+HtmlRenderer::HtmlRenderer(RenderConfig config)
+    : config_(std::move(config)) {}
+
+std::string HtmlRenderer::html_escape(const std::string& text) const {
+    std::string result;
+    result.reserve(text.size());
+    for (char c : text) {
+        switch (c) {
+            case '&':  result += "&amp;"; break;
+            case '<':  result += "&lt;"; break;
+            case '>':  result += "&gt;"; break;
+            case '"':  result += "&quot;"; break;
+            case '\'': result += "&#39;"; break;
+            default:   result += c;
+        }
+    }
+    return result;
+}
+
+std::string HtmlRenderer::kind_name(DesignUnitKind kind) const {
+    switch (kind) {
+        case DesignUnitKind::Module:    return "Module";
+        case DesignUnitKind::Package:   return "Package";
+        case DesignUnitKind::Interface: return "Interface";
+        case DesignUnitKind::Class:     return "Class";
+        case DesignUnitKind::Program:   return "Program";
+    }
+    return "Unknown";
+}
+
+std::string HtmlRenderer::kind_dir(DesignUnitKind kind) const {
+    switch (kind) {
+        case DesignUnitKind::Module:    return "modules";
+        case DesignUnitKind::Package:   return "packages";
+        case DesignUnitKind::Interface: return "interfaces";
+        case DesignUnitKind::Class:     return "classes";
+        case DesignUnitKind::Program:   return "programs";
+    }
+    return "other";
+}
+
+std::string HtmlRenderer::html_head(const std::string& title) const {
+    std::ostringstream ss;
+    ss << "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+       << "<meta charset=\"UTF-8\">\n"
+       << "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+       << "<title>" << html_escape(title) << "</title>\n"
+       << "<style>" << CSS_STYLE << "</style>\n"
+       << "</head>\n<body>\n";
+    return ss.str();
+}
+
+std::string HtmlRenderer::html_footer() const {
+    return "<script src=\"https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js\"></script>\n"
+           "<script>mermaid.initialize({startOnLoad:true});</script>\n"
+           "</body>\n</html>\n";
+}
+
+std::string HtmlRenderer::render_param_table(const std::vector<ParamDoc>& params) {
+    if (params.empty()) return {};
+    std::ostringstream ss;
+    ss << "<h2>Parameters</h2>\n<table>\n"
+       << "<tr><th>Name</th><th>Default</th><th>Description</th></tr>\n";
+    for (auto& p : params) {
+        ss << "<tr><td><code>" << html_escape(p.name) << "</code></td><td>"
+           << (p.default_text.empty() ? "-" : "<code>" + html_escape(p.default_text) + "</code>")
+           << "</td><td>"
+           << (p.description.empty() ? "-" : html_escape(p.description))
+           << "</td></tr>\n";
+    }
+    ss << "</table>\n";
+    return ss.str();
+}
+
+std::string HtmlRenderer::render_port_table(const std::vector<PortDoc>& ports) {
+    if (ports.empty()) return {};
+    std::ostringstream ss;
+    ss << "<h2>Ports</h2>\n<table>\n"
+       << "<tr><th>Name</th><th>Direction</th><th>Type</th><th>Description</th></tr>\n";
+    for (auto& p : ports) {
+        std::string dir;
+        switch (p.direction) {
+            case PortDirection::Input:  dir = "input"; break;
+            case PortDirection::Output: dir = "output"; break;
+            case PortDirection::Inout:  dir = "inout"; break;
+            case PortDirection::Ref:    dir = "ref"; break;
+        }
+        ss << "<tr><td><code>" << html_escape(p.name) << "</code></td><td>"
+           << dir << "</td><td>"
+           << (p.type_text.empty() ? "-" : "<code>" + html_escape(p.type_text) + "</code>")
+           << "</td><td>"
+           << (p.description.empty() ? "-" : html_escape(p.description))
+           << "</td></tr>\n";
+    }
+    ss << "</table>\n";
+    return ss.str();
+}
+
+std::string HtmlRenderer::render_mermaid_graph(const DocModel& model) {
+    std::ostringstream ss;
+    ss << "<h2>Dependency Graph</h2>\n"
+       << "<div class=\"mermaid\">\ngraph TD\n";
+    for (auto& unit : model.units) {
+        ss << "    " << unit.name << "[\"" << html_escape(unit.name) << "\"]\n";
+    }
+    for (auto& unit : model.units) {
+        for (auto& inst : unit.instantiates) {
+            ss << "    " << unit.name << " --> " << inst << "\n";
+        }
+    }
+    ss << "</div>\n";
+    return ss.str();
+}
+
+std::string HtmlRenderer::render_unit_graph(const DesignUnitDoc& unit,
+                                             const DocModel& /*model*/) {
+    std::ostringstream ss;
+    ss << "<h2>Dependency Graph</h2>\n"
+       << "<div class=\"mermaid\">\ngraph TD\n";
+    ss << "    " << unit.name << "[\"" << html_escape(unit.name) << "\"]:::current\n";
+    for (auto& name : unit.instantiated_by) {
+        ss << "    " << name << "[\"" << html_escape(name) << "\"]\n";
+        ss << "    " << name << " --> " << unit.name << "\n";
+    }
+    for (auto& name : unit.instantiates) {
+        ss << "    " << name << "[\"" << html_escape(name) << "\"]\n";
+        ss << "    " << unit.name << " --> " << name << "\n";
+    }
+    ss << "    classDef current fill:#f9f,stroke:#333,stroke-width:2px\n";
+    ss << "</div>\n";
+    return ss.str();
+}
+
+std::string HtmlRenderer::render_index(const DocModel& model) {
+    std::ostringstream ss;
+    ss << html_head(model.package.name + " Documentation");
+    ss << "<h1>" << html_escape(model.package.name) << "</h1>\n";
+    if (!model.package.version.empty()) {
+        ss << "<p><strong>Version</strong>: " << html_escape(model.package.version) << "</p>\n";
+    }
+
+    auto mods = model.modules();
+    if (!mods.empty()) {
+        ss << "<h2>Modules</h2>\n<table>\n"
+           << "<tr><th>Module</th><th>Description</th></tr>\n";
+        for (auto* m : mods) {
+            ss << "<tr><td><a href=\"modules/" << m->name << ".html\"><code>"
+               << html_escape(m->name) << "</code></a></td><td>"
+               << (m->doc.brief.empty() ? "-" : html_escape(m->doc.brief))
+               << "</td></tr>\n";
+        }
+        ss << "</table>\n";
+    }
+
+    auto ifs = model.interfaces();
+    if (!ifs.empty()) {
+        ss << "<h2>Interfaces</h2>\n<table>\n"
+           << "<tr><th>Interface</th><th>Description</th></tr>\n";
+        for (auto* m : ifs) {
+            ss << "<tr><td><a href=\"interfaces/" << m->name << ".html\"><code>"
+               << html_escape(m->name) << "</code></a></td><td>"
+               << (m->doc.brief.empty() ? "-" : html_escape(m->doc.brief))
+               << "</td></tr>\n";
+        }
+        ss << "</table>\n";
+    }
+
+    auto pkgs = model.packages();
+    if (!pkgs.empty()) {
+        ss << "<h2>Packages</h2>\n<table>\n"
+           << "<tr><th>Package</th><th>Description</th></tr>\n";
+        for (auto* m : pkgs) {
+            ss << "<tr><td><a href=\"packages/" << m->name << ".html\"><code>"
+               << html_escape(m->name) << "</code></a></td><td>"
+               << (m->doc.brief.empty() ? "-" : html_escape(m->doc.brief))
+               << "</td></tr>\n";
+        }
+        ss << "</table>\n";
+    }
+
+    if (config_.generate_diagrams && model.units.size() > 1) {
+        ss << render_mermaid_graph(model);
+    }
+
+    ss << html_footer();
+    return ss.str();
+}
+
+std::string HtmlRenderer::render_unit(const DesignUnitDoc& unit,
+                                       const DocModel& model) {
+    std::ostringstream ss;
+    ss << html_head(kind_name(unit.kind) + ": " + unit.name);
+    ss << "<nav><a href=\"../index.html\">Index</a></nav>\n";
+    ss << "<h1>" << kind_name(unit.kind) << ": <code>"
+       << html_escape(unit.name) << "</code></h1>\n";
+
+    if (unit.doc.has_deprecated()) {
+        ss << "<div class=\"deprecated\"><strong>Deprecated</strong>";
+        auto msg = unit.doc.deprecated_message();
+        if (!msg.empty()) ss << ": " << html_escape(msg);
+        ss << "</div>\n";
+    }
+
+    ss << "<p class=\"source-loc\"><strong>Source</strong>: <code>"
+       << html_escape(unit.file) << ":" << unit.line << "</code></p>\n";
+
+    if (!unit.doc.body.empty()) {
+        ss << "<p>" << html_escape(unit.doc.body) << "</p>\n";
+    }
+
+    ss << render_param_table(unit.params);
+    ss << render_port_table(unit.ports);
+
+    if (!unit.instantiates.empty()) {
+        ss << "<h2>Instantiates</h2>\n<ul>\n";
+        for (auto& name : unit.instantiates) {
+            auto* target = model.find_unit(name);
+            if (target) {
+                ss << "<li><a href=\"../" << kind_dir(target->kind)
+                   << "/" << name << ".html\"><code>" << html_escape(name)
+                   << "</code></a></li>\n";
+            } else {
+                ss << "<li><code>" << html_escape(name) << "</code> (external)</li>\n";
+            }
+        }
+        ss << "</ul>\n";
+    }
+
+    if (!unit.instantiated_by.empty()) {
+        ss << "<h2>Instantiated By</h2>\n<ul>\n";
+        for (auto& name : unit.instantiated_by) {
+            auto* source = model.find_unit(name);
+            if (source) {
+                ss << "<li><a href=\"../" << kind_dir(source->kind)
+                   << "/" << name << ".html\"><code>" << html_escape(name)
+                   << "</code></a></li>\n";
+            } else {
+                ss << "<li><code>" << html_escape(name) << "</code></li>\n";
+            }
+        }
+        ss << "</ul>\n";
+    }
+
+    auto sees = unit.doc.see_also();
+    if (!sees.empty()) {
+        ss << "<h2>See Also</h2>\n<ul>\n";
+        for (auto& name : sees) {
+            auto* target = model.find_unit(name);
+            if (target) {
+                ss << "<li><a href=\"../" << kind_dir(target->kind)
+                   << "/" << name << ".html\"><code>" << html_escape(name)
+                   << "</code></a></li>\n";
+            } else {
+                ss << "<li><code>" << html_escape(name) << "</code></li>\n";
+            }
+        }
+        ss << "</ul>\n";
+    }
+
+    if (config_.generate_diagrams &&
+        (!unit.instantiates.empty() || !unit.instantiated_by.empty())) {
+        ss << render_unit_graph(unit, model);
+    }
+
+    auto examples = unit.doc.tags_of(DocTagKind::Example);
+    if (!examples.empty()) {
+        ss << "<h2>Examples</h2>\n";
+        for (auto& ex : examples) {
+            ss << "<pre><code>" << html_escape(ex.text) << "</code></pre>\n";
+        }
+    }
+
+    auto notes = unit.doc.tags_of(DocTagKind::Note);
+    for (auto& n : notes) {
+        ss << "<div class=\"note\"><strong>Note</strong>: "
+           << html_escape(n.text) << "</div>\n";
+    }
+
+    auto warnings = unit.doc.tags_of(DocTagKind::Warning);
+    for (auto& w : warnings) {
+        ss << "<div class=\"warning\"><strong>Warning</strong>: "
+           << html_escape(w.text) << "</div>\n";
+    }
+
+    ss << html_footer();
+    return ss.str();
+}
+
+std::string HtmlRenderer::render_search_index(const DocModel& model) {
+    std::ostringstream ss;
+    ss << "{\"units\":[";
+    for (size_t i = 0; i < model.units.size(); ++i) {
+        auto& u = model.units[i];
+        if (i > 0) ss << ",";
+        ss << "{\"name\":\"" << u.name
+           << "\",\"kind\":\"" << kind_name(u.kind)
+           << "\",\"brief\":\"" << u.doc.brief
+           << "\",\"file\":\"" << u.file
+           << "\",\"path\":\"" << kind_dir(u.kind) << "/" << u.name << ".html"
+           << "\"}";
+    }
+    ss << "],\"package\":{\"name\":\"" << model.package.name
+       << "\",\"version\":\"" << model.package.version << "\"}}";
+    return ss.str();
+}
+
+Result<std::monostate> HtmlRenderer::render(const DocModel& model) {
+    auto base = config_.output_dir;
+
+    if (config_.clean_before_generate && fs::exists(base)) {
+        fs::remove_all(base);
+    }
+
+    fs::create_directories(base / "modules");
+    fs::create_directories(base / "interfaces");
+    fs::create_directories(base / "packages");
+
+    // Write index
+    {
+        std::ofstream f(base / "index.html");
+        if (!f.is_open()) {
+            return LoomError(LoomError::IO, "cannot write " + (base / "index.html").string());
+        }
+        f << render_index(model);
+    }
+
+    // Write per-unit pages
+    for (auto& unit : model.units) {
+        auto dir = base / kind_dir(unit.kind);
+        fs::create_directories(dir);
+        auto path = dir / (unit.name + ".html");
+        std::ofstream f(path);
+        if (!f.is_open()) {
+            return LoomError(LoomError::IO, "cannot write " + path.string());
+        }
+        f << render_unit(unit, model);
+    }
+
+    // Write search index
+    {
+        std::ofstream f(base / "search_index.json");
+        if (!f.is_open()) {
+            return LoomError(LoomError::IO, "cannot write search_index.json");
+        }
+        f << render_search_index(model);
+    }
+
+    return ok_status();
+}
+
 } // namespace loom::doc
